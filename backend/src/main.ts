@@ -1,0 +1,36 @@
+import 'reflect-metadata';
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { WsAdapter } from '@nestjs/platform-ws';
+import { AppModule } from './app.module';
+import { LoggingMiddleware } from './common/middleware/logging.middleware';
+import { AppLogger } from './common/logger/app-logger';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, { logger: new AppLogger() });
+  app.getHttpAdapter().getInstance().disable('etag');
+
+  const corsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+    : ['http://localhost:3000'];
+
+  app.enableCors({ origin: corsOrigins, credentials: true });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  app.useWebSocketAdapter(new WsAdapter(app) as any);
+  app.use(new LoggingMiddleware().use.bind(new LoggingMiddleware()));
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  const port = parseInt(process.env.PORT ?? '8000', 10);
+  await app.listen(port, '0.0.0.0');
+  console.log(`Backend listening on port ${port}`);
+}
+
+bootstrap();
