@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ModelArena",
+  title: "Model Arena",
   description: "LLM evaluation & debate platform — structured debates with multi-judge consensus scoring",
 };
 

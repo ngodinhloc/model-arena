@@ -24,11 +24,11 @@ export default function AgentConfigCard({ label, config, providers, onChange }: 
     "w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-800 focus:border-indigo-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200";
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
+    <div className="rounded-lg border border-zinc-400 bg-white p-4 shadow-sm shadow-slate-200/40 dark:border-zinc-600 dark:bg-zinc-900/60 dark:shadow-black/10">
       <p className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">{label}</p>
       <div className="space-y-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Provider</label>
+        <div className="grid gap-2 sm:grid-cols-[5.5rem_1fr] sm:items-center">
+          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Provider</label>
           <select value={config.provider} onChange={(e) => handleProviderChange(e.target.value)} className={selectClass}>
             {providers.map((p) => (
               <option key={p.id} value={p.name}>
@@ -37,8 +37,8 @@ export default function AgentConfigCard({ label, config, providers, onChange }: 
             ))}
           </select>
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Model</label>
+        <div className="grid gap-2 sm:grid-cols-[5.5rem_1fr] sm:items-center">
+          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Model</label>
           <select
             value={config.model}
             onChange={(e) => onChange({ ...config, model: e.target.value })}
@@ -51,8 +51,8 @@ export default function AgentConfigCard({ label, config, providers, onChange }: 
             ))}
           </select>
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Temperature</label>
+        <div className="grid gap-2 sm:grid-cols-[5.5rem_1fr] sm:items-center">
+          <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Temperature</label>
           <select
             value={config.temperature}
             onChange={(e) => onChange({ ...config, temperature: parseFloat(e.target.value) })}

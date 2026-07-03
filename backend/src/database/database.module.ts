@@ -6,6 +6,8 @@ import { Category } from './entities/category.entity';
 import { Topic } from './entities/topic.entity';
 import { Experiment } from './entities/experiment.entity';
 import { Result } from './entities/result.entity';
+import { SeedProvidersModels1783036800000 } from './migrations/1783036800000-SeedProvidersModels';
+import { SeedCategoriesTopics1783036800001 } from './migrations/1783036800001-SeedCategoriesTopics';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { Result } from './entities/result.entity';
         type: 'postgres',
         url: process.env.DATABASE_URL,
         entities: [Provider, Model, Category, Topic, Experiment, Result],
+        migrations: [SeedProvidersModels1783036800000, SeedCategoriesTopics1783036800001],
+        migrationsRun: true,
         synchronize: true,
         logging: false,
       }),

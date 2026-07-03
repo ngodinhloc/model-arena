@@ -41,7 +41,7 @@ export default function Sidebar() {
         {isOpen && (
           <span className="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
             <Swords size={15} className="text-indigo-500" />
-            ModelArena
+            Model Arena
           </span>
         )}
       </div>
