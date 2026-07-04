@@ -18,7 +18,23 @@
       "Bash(npx tsc *)",
       "Bash(python3 -c ' *)",
       "Bash(curl -s http://localhost:8000/api/experiments/862fde9b-9fe2-4e71-8f16-25607f7a7eac)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -X POST http://localhost:8000/api/experiments -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(python3 -m py_compile app/agent/candidate_graph.py app/container.py)",
+      "Bash(python3 -m py_compile app/agent/candidate_graph.py app/agent/nodes/advance_round_node.py app/container.py)",
+      "Bash(python3 -m py_compile app/agent/llm_factory.py app/agent/candidate_graph.py app/agent/nodes/candidate_node.py app/container.py)",
+      "Bash(curl -s http://localhost:8000/api/experiments/8e1932db-4ca5-42ec-bc46-82d5d3024d2d)",
+      "Bash(python3 -m py_compile app/agent/model_factory.py app/agent/candidate_graph.py app/agent/nodes/candidate_node.py app/container.py)",
+      "Bash(python3 -m py_compile app/agent/judge_templates.py app/agent/nodes/judge_node.py)",
+      "Bash(python3 -m py_compile app/agent/model_factory.py app/agent/judge_graph.py app/agent/nodes/judge_node.py app/container.py)",
+      "Bash(curl -s http://localhost:8000/api/experiments/ed0d30b5-ba3a-4a24-ac7e-05a576ed9dff)",
+      "Bash(python3 -m py_compile app/agent/nodes/judge_node.py)",
+      "Bash(python3 -m py_compile app/agent/judge_interfaces.py app/agent/nodes/judge_node.py)",
+      "Bash(python3 -m py_compile app/agent/nodes/candidate_node.py)",
+      "Bash(python3 -m py_compile app/agent/model_factory.py app/agent/score_graph.py app/agent/nodes/score_node.py app/container.py)",
+      "Bash(curl -s http://localhost:8000/api/experiments/115dcb0f-b3f5-4ee5-a56d-202bc61c5a85)",
+      "Bash(python3 -m py_compile app/agent/score_templates.py app/agent/nodes/score_node.py)",
+      "Bash(python3 -m py_compile app/agent/score_interfaces.py app/agent/nodes/score_node.py)"
     ]
   }
 }

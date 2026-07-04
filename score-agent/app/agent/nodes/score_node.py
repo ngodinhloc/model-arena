@@ -1,12 +1,11 @@
 from __future__ import annotations
 import logging
-from typing import Literal
 from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel
 
-from app.agent.llm_factory import build_llm
-from app.agent.templates import ARBITER_SYSTEM, ARBITER_PROMPT
-from app.configs.event_configs import PUBLISH_EVENT_NAME
+from app.agent.model_factory import ModelFactory
+from app.agent.score_interfaces import WinnerDecision
+from app.agent.score_state import ScoreState
+from app.agent.score_templates import ARBITER_SYSTEM, ARBITER_PROMPT
 from app.configs.settings import settings
 from app.contracts.experiment_interface import (
     CandidateScore,
@@ -16,27 +15,20 @@ from app.contracts.experiment_interface import (
     NodeName,
     ScoreResponse,
 )
-from app.events.rabbitmq_publisher import RabbitMQPublisher
 from app.services.experiment_manager import ExperimentManager
 
 
-class WinnerDecision(BaseModel):
-    """Structured output of the arbiter LLM."""
-
-    winner: Literal["Candidate 1", "Candidate 2"]
-    comment: str
-
-
-class ScoreService:
+class ScoreNode:
     """Sums judge score sheets deterministically, then asks an arbiter LLM to
     declare the winner (mandatory even on tied totals) with a justification."""
 
-    def __init__(self, manager: ExperimentManager, publisher: RabbitMQPublisher, logger: logging.Logger):
+    def __init__(self, manager: ExperimentManager, logger: logging.Logger, model_factory: ModelFactory):
         self._manager = manager
-        self._publisher = publisher
         self._logger = logger
+        self._model_factory = model_factory
 
-    async def execute(self, event: ExperimentEvent) -> None:
+    async def __call__(self, state: ScoreState) -> dict:
+        event = state["event"]
         cache = await self._manager.load(event.experimentId)
         messages = cache.messages if cache else event.messages
 
@@ -46,15 +38,8 @@ class ScoreService:
         score_response = await self._score(event, messages)
 
         await self._manager.complete_message(event.experimentId, actor, score_response, final=True)
-
-        cache = await self._manager.load(event.experimentId)
-        payload = event.model_copy(update={
-            "eventName": PUBLISH_EVENT_NAME,
-            "messages": cache.messages if cache else messages,
-        })
-        await self._publisher.publish(PUBLISH_EVENT_NAME, payload.model_dump(mode="json"))
         self._logger.info(
-            "ScoreService.execute: scores published",
+            "ScoreNode: scores recorded",
             extra={
                 "experimentId": event.experimentId,
                 "winner": score_response.winner,
@@ -62,6 +47,7 @@ class ScoreService:
                 "tie": score_response.tie,
             },
         )
+        return {}
 
     async def _score(self, event: ExperimentEvent, messages: list[Message]) -> ScoreResponse:
         totals, candidate_scores = self._compute_totals(event, messages)
@@ -120,12 +106,12 @@ class ScoreService:
 
         try:
             llm = (
-                build_llm(settings.score_provider, settings.score_model, temperature=0)
+                self._model_factory.build(settings.score_provider, settings.score_model, temperature=0)
                 .with_structured_output(WinnerDecision, method="json_schema")
                 .with_retry(stop_after_attempt=3)
             )
             self._logger.info(
-                "ScoreService._decide: calling arbiter LLM",
+                "ScoreNode._decide: calling arbiter LLM",
                 extra={
                     "experimentId": event.experimentId,
                     "model": f"{settings.score_provider}/{settings.score_model}",
@@ -139,7 +125,7 @@ class ScoreService:
         except Exception as e:
             # Fall back to the point totals so the pipeline still completes.
             self._logger.exception(
-                "ScoreService._decide: arbiter LLM failed, falling back to totals",
+                "ScoreNode._decide: arbiter LLM failed, falling back to totals",
                 extra={"experimentId": event.experimentId, "error": str(e)},
             )
             winner_number = 1 if totals[1] >= totals[2] else 2

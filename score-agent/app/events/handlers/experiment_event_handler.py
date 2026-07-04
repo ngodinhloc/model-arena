@@ -1,11 +1,11 @@
 import logging
+from langgraph.graph.state import CompiledStateGraph
 from app.contracts.experiment_interface import ExperimentEvent
-from app.services.score_service import ScoreService
 
 
 class ExperimentEventHandler:
-    def __init__(self, score_service: ScoreService, logger: logging.Logger):
-        self._score_service = score_service
+    def __init__(self, agent_graph: CompiledStateGraph, logger: logging.Logger):
+        self._agent_graph = agent_graph
         self._logger = logger
 
     async def handle(self, event: ExperimentEvent) -> None:
@@ -13,4 +13,4 @@ class ExperimentEventHandler:
             "ExperimentEventHandler.handle: Received event",
             extra={"experimentId": event.experimentId, "eventName": event.eventName},
         )
-        await self._score_service.execute(event)
+        await self._agent_graph.ainvoke({"event": event})

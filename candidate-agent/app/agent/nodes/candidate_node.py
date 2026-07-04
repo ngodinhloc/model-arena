@@ -1,0 +1,75 @@
+from __future__ import annotations
+import logging
+from langchain_core.messages import HumanMessage, SystemMessage
+
+from app.agent.candidate_state import CandidateState
+from app.agent.model_factory import ModelFactory
+from app.agent.candidate_templates import CANDIDATE_SYSTEM, CANDIDATE_PROMPT, STANCES
+from app.contracts.experiment_interface import CandidateResponse, Message, NodeName
+from app.services.experiment_manager import ExperimentManager
+
+
+class CandidateNode:
+    def __init__(
+        self,
+        candidate_number: int,
+        manager: ExperimentManager,
+        logger: logging.Logger,
+        model_factory: ModelFactory,
+    ):
+        self._number = candidate_number
+        self._manager = manager
+        self._logger = logger
+        self._model_factory = model_factory
+
+    async def __call__(self, state: CandidateState) -> dict:
+        event = state["event"]
+        round_number = state["round"]
+        cfg = next(c for c in event.candidateConfigs if c.candidateNumber == self._number)
+        actor = f"Candidate {self._number} ({cfg.provider}/{cfg.model})"
+        stance = STANCES[self._number]
+
+        await self._manager.append_thinking(event.experimentId, NodeName.candidate, actor)
+
+        cache = await self._manager.load(event.experimentId)
+        transcript = self._format_transcript(cache.messages if cache else [])
+
+        llm = (
+            self._model_factory.build(cfg.provider, cfg.model, cfg.temperature)
+            .with_structured_output(CandidateResponse, method="json_schema")
+            .with_retry(stop_after_attempt=3)
+        )
+        self._logger.info(
+            "CandidateNode: calling LLM",
+            extra={"experimentId": event.experimentId, "actor": actor, "stance": stance, "round": round_number},
+        )
+        response: CandidateResponse = await llm.ainvoke([
+            SystemMessage(content=CANDIDATE_SYSTEM.format(
+                candidate_number=self._number, persona=cfg.persona, stance=stance,
+            )),
+            HumanMessage(content=CANDIDATE_PROMPT.format(
+                category=event.category,
+                topic=event.topic,
+                stance=stance,
+                round_number=round_number,
+                total_rounds=event.rounds,
+                transcript=transcript,
+            )),
+        ])
+
+        await self._manager.complete_message(event.experimentId, actor, response)
+        return {}
+
+    @staticmethod
+    def _label(actor: str) -> str:
+        return "Candidate 1" if actor.startswith("Candidate 1") else "Candidate 2"
+
+    @classmethod
+    def _format_transcript(cls, messages: list[Message]) -> str:
+        turns = []
+        for message in messages:
+            if message.node != NodeName.candidate or not isinstance(message.response, CandidateResponse):
+                continue
+            arguments = "\n".join(f"- {a}" for a in message.response.arguments)
+            turns.append(f"{cls._label(message.actor)}: {message.response.header}\n{arguments}")
+        return "\n\n".join(turns) if turns else "(none yet — you are opening the debate)"
