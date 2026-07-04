@@ -131,7 +131,33 @@ export interface AnalyticsModelRow {
   avgScore: number;
 }
 
+export interface AnalyticsCategoryModelRow {
+  model: string;
+  wins: number;
+  battles: number;
+}
+
+export interface AnalyticsCategoryWinners {
+  category: string;
+  models: AnalyticsCategoryModelRow[];
+}
+
+export interface AnalyticsScoreCardRow {
+  cardName: string;
+  maxPoint: number;
+  maxPossible: number;
+  model: string;
+}
+
+export interface AnalyticsScoreCardWinners {
+  cardName: string;
+  models: AnalyticsCategoryModelRow[];
+}
+
 export interface Analytics {
   totalExperiments: number;
   models: AnalyticsModelRow[];
+  categoryWinners: AnalyticsCategoryWinners[];
+  scoreCards: AnalyticsScoreCardRow[];
+  scoreCardWinners: AnalyticsScoreCardWinners[];
 }

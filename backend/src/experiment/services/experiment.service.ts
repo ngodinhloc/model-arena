@@ -16,6 +16,7 @@ import {
   ExperimentCache,
   ExperimentStatus,
   JudgeConfig,
+  JudgeScoreSheet,
   SCORE_CARD_MAX_POINT,
   SCORE_CARD_NAMES,
 } from '../contracts/experiment.interface';
@@ -136,11 +137,21 @@ export class ExperimentService {
     const results = await this.resultRepo.find({ relations: { experiment: true } });
 
     const modelStats = new Map<string, { wins: number; battles: number; totalScore: number }>();
+    const categoryStats = new Map<string, Map<string, { wins: number; battles: number }>>();
+    const cardStats = new Map<string, { maxPoint: number; model: string }>();
+    const cardWinnerStats = new Map<string, Map<string, { wins: number; battles: number }>>();
+
     for (const result of results) {
       const score = result.scoreResponse;
       if (!score?.candidateScores) continue;
+
+      const category = result.experiment.category;
+      const candidateModels = new Map<number, string>();
+
       for (const cs of score.candidateScores) {
         const key = `${cs.provider}/${cs.model}`;
+        candidateModels.set(cs.candidateNumber, key);
+
         const stats = modelStats.get(key) ?? { wins: 0, battles: 0, totalScore: 0 };
         stats.battles += 1;
         stats.totalScore += cs.score;
@@ -148,6 +159,54 @@ export class ExperimentService {
         const isWinner = score.winner === `Candidate ${cs.candidateNumber}`;
         if (isWinner) stats.wins += 1;
         modelStats.set(key, stats);
+
+        const catMap = categoryStats.get(category) ?? new Map<string, { wins: number; battles: number }>();
+        const catStat = catMap.get(key) ?? { wins: 0, battles: 0 };
+        catStat.battles += 1;
+        if (isWinner) catStat.wins += 1;
+        catMap.set(key, catStat);
+        categoryStats.set(category, catMap);
+      }
+
+      const cardTotals = new Map<number, Map<string, number>>();
+
+      for (const msg of result.judgeResponse ?? []) {
+        if (msg.node !== 'judge' || !msg.response) continue;
+        for (const sheet of msg.response as JudgeScoreSheet[]) {
+          const model = candidateModels.get(sheet.candidateNumber) ?? `Candidate ${sheet.candidateNumber}`;
+          const totals = cardTotals.get(sheet.candidateNumber) ?? new Map<string, number>();
+          for (const card of sheet.cards) {
+            const best = cardStats.get(card.cardName);
+            if (!best || card.point > best.maxPoint) {
+              cardStats.set(card.cardName, { maxPoint: card.point, model });
+            }
+            totals.set(card.cardName, (totals.get(card.cardName) ?? 0) + card.point);
+          }
+          cardTotals.set(sheet.candidateNumber, totals);
+        }
+      }
+
+      // Sum each judge's per-card points per candidate, then the higher total wins that card for this battle.
+      const totals1 = cardTotals.get(1);
+      const totals2 = cardTotals.get(2);
+      const model1 = candidateModels.get(1);
+      const model2 = candidateModels.get(2);
+      if (totals1 && totals2 && model1 && model2) {
+        const cardNames = new Set([...totals1.keys(), ...totals2.keys()]);
+        for (const cardName of cardNames) {
+          const p1 = totals1.get(cardName) ?? 0;
+          const p2 = totals2.get(cardName) ?? 0;
+          const cardMap = cardWinnerStats.get(cardName) ?? new Map<string, { wins: number; battles: number }>();
+          const s1 = cardMap.get(model1) ?? { wins: 0, battles: 0 };
+          const s2 = cardMap.get(model2) ?? { wins: 0, battles: 0 };
+          s1.battles += 1;
+          s2.battles += 1;
+          if (p1 > p2) s1.wins += 1;
+          else if (p2 > p1) s2.wins += 1;
+          cardMap.set(model1, s1);
+          cardMap.set(model2, s2);
+          cardWinnerStats.set(cardName, cardMap);
+        }
       }
     }
 
@@ -162,6 +221,22 @@ export class ExperimentService {
           avgScore: s.battles ? Math.round(s.totalScore / s.battles) : 0,
         }))
         .sort((a, b) => b.winRate - a.winRate),
+      categoryWinners: [...categoryStats.entries()].map(([category, catMap]) => ({
+        category,
+        models: [...catMap.entries()]
+          .map(([model, s]) => ({ model, wins: s.wins, battles: s.battles }))
+          .sort((a, b) => b.wins - a.wins),
+      })),
+      scoreCards: SCORE_CARD_NAMES.filter((cardName) => cardStats.has(cardName)).map((cardName) => {
+        const best = cardStats.get(cardName)!;
+        return { cardName, maxPoint: best.maxPoint, maxPossible: SCORE_CARD_MAX_POINT, model: best.model };
+      }),
+      scoreCardWinners: SCORE_CARD_NAMES.filter((cardName) => cardWinnerStats.has(cardName)).map((cardName) => ({
+        cardName,
+        models: [...cardWinnerStats.get(cardName)!.entries()]
+          .map(([model, s]) => ({ model, wins: s.wins, battles: s.battles }))
+          .sort((a, b) => b.wins - a.wins),
+      })),
     };
   }
 }
