@@ -144,14 +144,21 @@ export interface AnalyticsCategoryWinners {
 
 export interface AnalyticsScoreCardRow {
   cardName: string;
-  maxPoint: number;
+  avgPoint: number;
   maxPossible: number;
-  model: string;
+  evaluations: number;
 }
 
 export interface AnalyticsScoreCardWinners {
   cardName: string;
   models: AnalyticsCategoryModelRow[];
+}
+
+export interface AnalyticsJudgeAvgScoreRow {
+  model: string;
+  avgScore: number;
+  evaluations: number;
+  maxPossible: number;
 }
 
 export interface Analytics {
@@ -160,4 +167,5 @@ export interface Analytics {
   categoryWinners: AnalyticsCategoryWinners[];
   scoreCards: AnalyticsScoreCardRow[];
   scoreCardWinners: AnalyticsScoreCardWinners[];
+  judgeAvgScores: AnalyticsJudgeAvgScoreRow[];
 }

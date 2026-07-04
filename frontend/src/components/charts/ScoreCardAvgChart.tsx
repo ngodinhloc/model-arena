@@ -2,7 +2,7 @@
 
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, TooltipContentProps, XAxis, YAxis } from "recharts";
 import { AnalyticsScoreCardRow } from "@/types/experiment";
-import { modelLabel, seriesColor, useChartTheme } from "./theme";
+import { seriesColor, useChartTheme } from "./theme";
 
 function ScoreCardTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !payload?.length) return null;
@@ -13,16 +13,16 @@ function ScoreCardTooltip({ active, payload }: TooltipContentProps) {
       <div className="font-medium text-zinc-900 dark:text-zinc-100">{card.cardName}</div>
       <div className="text-zinc-500 dark:text-zinc-400">
         <span className="font-mono text-zinc-800 dark:text-zinc-200">
-          {card.maxPoint}/{card.maxPossible}
+          {card.avgPoint}/{card.maxPossible}
         </span>{" "}
-        pts
+        avg pts
       </div>
-      <div className="text-zinc-500 dark:text-zinc-400">by {modelLabel(card.model)}</div>
+      <div className="text-zinc-500 dark:text-zinc-400">{card.evaluations} evaluations</div>
     </div>
   );
 }
 
-export function ScoreCardMaxChart({ cards = [] }: { cards: AnalyticsScoreCardRow[] }) {
+export function ScoreCardAvgChart({ cards = [] }: { cards: AnalyticsScoreCardRow[] }) {
   const theme = useChartTheme();
 
   if (cards.length === 0) {
@@ -44,11 +44,11 @@ export function ScoreCardMaxChart({ cards = [] }: { cards: AnalyticsScoreCardRow
           tickLine={false}
         />
         <Tooltip content={ScoreCardTooltip} cursor={{ fill: theme.grid, opacity: 0.4 }} />
-        <Bar dataKey="maxPoint" radius={[4, 4, 0, 0]} maxBarSize={56}>
+        <Bar dataKey="avgPoint" radius={[4, 4, 0, 0]} maxBarSize={56}>
           {cards.map((card, i) => (
             <Cell key={card.cardName} fill={seriesColor(theme, i)} />
           ))}
-          <LabelList dataKey="maxPoint" position="top" fill={theme.ink} fontSize={12} fontWeight={600} />
+          <LabelList dataKey="avgPoint" position="top" fill={theme.ink} fontSize={12} fontWeight={600} />
         </Bar>
       </BarChart>
     </ResponsiveContainer>

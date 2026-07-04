@@ -5,8 +5,9 @@ import { BarChart3, Crown, Star, Swords, TrendingUp, Trophy } from "lucide-react
 import { getAnalytics } from "@/lib/api";
 import { Analytics } from "@/types/experiment";
 import { CategoryWinnersChart } from "@/components/charts/CategoryWinnersChart";
-import { ScoreCardMaxChart } from "@/components/charts/ScoreCardMaxChart";
+import { ScoreCardAvgChart } from "@/components/charts/ScoreCardAvgChart";
 import { ScoreCardWinnersChart } from "@/components/charts/ScoreCardWinnersChart";
+import { JudgeAvgScoreChart } from "@/components/charts/JudgeAvgScoreChart";
 import { seriesColor, useChartTheme } from "@/components/charts/theme";
 
 export default function AnalyticsPage() {
@@ -125,9 +126,16 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-            <h2 className="mb-4 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Highest score per score card</h2>
-            <ScoreCardMaxChart cards={analytics.scoreCards} />
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
+            <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+              <h2 className="mb-4 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Average score per score card</h2>
+              <ScoreCardAvgChart cards={analytics.scoreCards} />
+            </div>
+
+            <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+              <h2 className="mb-4 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Average score by judge</h2>
+              <JudgeAvgScoreChart judges={analytics.judgeAvgScores} />
+            </div>
           </div>
         </>
       )}
