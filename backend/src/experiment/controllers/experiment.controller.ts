@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, Query, ParseUUIDPipe, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, ParseUUIDPipe } from '@nestjs/common';
 import { ExperimentService } from '../services/experiment.service';
 import { CreateExperimentDto } from '../dto/create-experiment.dto';
 
@@ -12,11 +12,8 @@ export class ExperimentController {
   }
 
   @Get('experiments')
-  listExperiments(
-    @Query('category_id', new ParseIntPipe({ optional: true })) categoryId?: number,
-    @Query('topic_id', new ParseIntPipe({ optional: true })) topicId?: number,
-  ) {
-    return this.experimentService.listExperiments(categoryId, topicId);
+  listExperiments() {
+    return this.experimentService.listExperiments();
   }
 
   @Get('analytics')

@@ -10,11 +10,12 @@ import { AgentStatus, ExperimentCache, ExperimentStatus } from '../contracts/exp
 
 const POLL_INTERVAL_MS = 500;
 const MAX_POLLS = 1200; // 10 min timeout
+const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
-const WS_PATH = /^\/ws\/experiments\/([0-9a-fA-F-]{36})$/;
-
+// @nestjs/platform-ws routes upgrades by an exact literal pathname match against
+// this path, so the uuid must travel as a query param rather than a path segment.
 @Injectable()
-@WebSocketGateway()
+@WebSocketGateway({ path: '/ws/experiments' })
 export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(ExperimentGateway.name);
   private readonly subscriptions = new Map<WebSocket, NodeJS.Timeout>();
@@ -25,12 +26,11 @@ export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconne
   ) {}
 
   async handleConnection(client: WebSocket, req: IncomingMessage): Promise<void> {
-    const match = WS_PATH.exec(req.url ?? '');
-    if (!match) {
-      client.close(1008, 'Expected path /ws/experiments/{uuid}');
+    const uuid = new URL(req.url ?? '', 'http://localhost').searchParams.get('uuid') ?? '';
+    if (!UUID_RE.test(uuid)) {
+      client.close(1008, 'Expected ?uuid={uuid}');
       return;
     }
-    const uuid = match[1];
 
     const experiment = await this.experimentRepo.findOne({ where: { uuid } });
     if (!experiment) {

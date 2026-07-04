@@ -33,6 +33,11 @@ export class CreateExperimentDto {
   @IsInt()
   topicId!: number;
 
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  rounds!: number;
+
   @IsArray()
   @ArrayMinSize(2)
   @ArrayMaxSize(2)

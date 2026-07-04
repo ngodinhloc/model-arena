@@ -81,6 +81,7 @@ class ExperimentEvent(BaseModel):
     experimentId: str
     category: str
     topic: str
+    rounds: int
     candidateConfigs: list[CandidateConfig]
     judgeConfigs: list[JudgeConfig]
     scoreCards: list[ScoreCardConfig]

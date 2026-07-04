@@ -9,7 +9,16 @@
       "Bash(curl -s http://localhost:8000/api/categories)",
       "Bash(curl -s \"http://localhost:8000/api/providers\")",
       "Bash(curl -s \"http://localhost:8000/api/topics?categoryId=4\")",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(len\\(d\\), 'topics in category 4'\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(len\\(d\\), 'topics in category 4'\\)\")",
+      "Bash(rm -f database/entities/category.entity.ts database/entities/topic.entity.ts database/entities/provider.entity.ts database/entities/model.entity.ts database/migrations/1783036800000-SeedProvidersModels.ts database/migrations/1783036800001-SeedCategoriesTopics.ts)",
+      "Bash(rmdir database/migrations)",
+      "Bash(grep -rn \"SeedProvidersModels\\\\|SeedCategoriesTopics\\\\|entities/category\\\\|entities/topic\\\\|entities/provider\\\\|entities/model\" .)",
+      "Bash(grep -rln \"migrations\" .)",
+      "Bash(git -C /Users/kenngo/Documents/Projects/model-arena status --short)",
+      "Bash(npx tsc *)",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s http://localhost:8000/api/experiments/862fde9b-9fe2-4e71-8f16-25607f7a7eac)",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }

@@ -27,6 +27,7 @@ export interface AgentConfig {
 
 export interface CreateExperimentRequest {
   topicId: number;
+  rounds: number;
   candidates: AgentConfig[];
   candidatePersona: string;
   judges: AgentConfig[];
@@ -101,7 +102,6 @@ export interface ExperimentCache {
 
 export interface ExperimentSummary {
   uuid: string;
-  topicId: number;
   topic: string;
   category: string;
   candidateConfig: CandidateConfig[];

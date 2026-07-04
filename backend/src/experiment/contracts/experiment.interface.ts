@@ -81,7 +81,7 @@ export type MessageResponse = CandidateResponse | JudgeScoreSheet[] | ScoreRespo
 
 export interface Message {
   node: 'candidate' | 'judge' | 'score';
-  actor: string;
+  actor: string;  
   response: MessageResponse | null;
   agentStatus: AgentStatus;
 }
@@ -91,6 +91,7 @@ export interface ExperimentEvent {
   experimentId: string;
   category: string;
   topic: string;
+  rounds: number;
   candidateConfigs: CandidateConfig[];
   judgeConfigs: JudgeConfig[];
   scoreCards: ScoreCardConfig[];

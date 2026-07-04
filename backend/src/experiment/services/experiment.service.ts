@@ -56,7 +56,9 @@ export class ExperimentService {
 
     const experiment = this.experimentRepo.create({
       uuid,
-      topicId: topic.id,
+      category: topic.categoryName,
+      topic: topic.topic,
+      rounds: dto.rounds,
       candidateConfig: candidateConfigs,
       judgeConfig: judgeConfigs,
       status: ExperimentStatus.running,
@@ -66,8 +68,9 @@ export class ExperimentService {
     const cache: ExperimentCache = {
       eventName: EVENT_EXPERIMENT_CREATED,
       experimentId: uuid,
-      category: topic.category.name,
+      category: topic.categoryName,
       topic: topic.topic,
+      rounds: dto.rounds,
       candidateConfigs,
       judgeConfigs,
       scoreCards: SCORE_CARD_NAMES.map((cardName) => ({ cardName, maxPoint: SCORE_CARD_MAX_POINT })),
@@ -82,21 +85,12 @@ export class ExperimentService {
     return { uuid };
   }
 
-  async listExperiments(categoryId?: number, topicId?: number) {
-    const qb = this.experimentRepo
-      .createQueryBuilder('experiment')
-      .leftJoinAndSelect('experiment.topic', 'topic')
-      .leftJoinAndSelect('topic.category', 'category')
-      .orderBy('experiment.createdAt', 'DESC');
-    if (topicId) qb.andWhere('experiment.topic_id = :topicId', { topicId });
-    if (categoryId) qb.andWhere('topic.category_id = :categoryId', { categoryId });
-
-    const experiments = await qb.getMany();
+  async listExperiments() {
+    const experiments = await this.experimentRepo.find({ order: { createdAt: 'DESC' } });
     return experiments.map((e) => ({
       uuid: e.uuid,
-      topicId: e.topicId,
-      topic: e.topic?.topic,
-      category: e.topic?.category?.name,
+      topic: e.topic,
+      category: e.category,
       candidateConfig: e.candidateConfig,
       judgeConfig: e.judgeConfig,
       status: e.status,
@@ -105,16 +99,13 @@ export class ExperimentService {
   }
 
   async getExperiment(uuid: string) {
-    const experiment = await this.experimentRepo.findOne({
-      where: { uuid },
-      relations: { topic: { category: true } },
-    });
+    const experiment = await this.experimentRepo.findOne({ where: { uuid } });
     if (!experiment) throw new NotFoundException(`Experiment ${uuid} not found`);
 
     const base = {
       uuid: experiment.uuid,
-      topic: experiment.topic?.topic,
-      category: experiment.topic?.category?.name,
+      topic: experiment.topic,
+      category: experiment.category,
       candidateConfig: experiment.candidateConfig,
       judgeConfig: experiment.judgeConfig,
       status: experiment.status,

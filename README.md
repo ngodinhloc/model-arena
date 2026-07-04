@@ -52,4 +52,4 @@ Then open http://localhost:3000, pick a category/topic, configure two candidates
 - Each judge scores both candidates on 5 fixed score cards (0–20 each, 100 max per judge per candidate); totals across 2 judges max out at 200 per candidate.
 - The score agent sums the points deterministically, then feeds the judge score sheets to an arbiter LLM (`SCORE_PROVIDER`/`SCORE_MODEL`, default `anthropic/claude-opus-4-8`) which declares the winner with a written justification — on tied totals it still must pick one and explain the tie-break.
 - The temperature dropdown is ignored for Anthropic models that reject sampling parameters (Opus 4.7+, Sonnet 5).
-- Model catalog, categories, and topics are seeded on backend boot — edit `backend/src/catalog/seed/catalog.seed.ts`.
+- Model catalog, categories, and topics are static seed data — edit `backend/src/catalog/data/providers.seed.ts` and `backend/src/catalog/data/categories.seed.ts`.

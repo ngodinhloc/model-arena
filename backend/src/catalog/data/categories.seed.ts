@@ -1,6 +1,15 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+export interface TopicSeed {
+  id: number;
+  topic: string;
+}
 
-const CATEGORIES: Record<string, string[]> = {
+export interface CategorySeed {
+  id: number;
+  name: string;
+  topics: TopicSeed[];
+}
+
+const CATEGORY_TOPICS: Record<string, string[]> = {
   Technology: [
     'AI systems should be open-sourced rather than kept proprietary',
     'Microservices are a better default architecture than monoliths',
@@ -123,43 +132,10 @@ const CATEGORIES: Record<string, string[]> = {
   ],
 };
 
-export class SeedCategoriesTopics1783036800001 implements MigrationInterface {
-  name = 'SeedCategoriesTopics1783036800001';
+let nextTopicId = 1;
 
-  public async up(queryRunner: QueryRunner): Promise<void> {
-    for (const [categoryName, topics] of Object.entries(CATEGORIES)) {
-      await queryRunner.query(
-        `INSERT INTO categories (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
-        [categoryName],
-      );
-      for (const topic of topics) {
-        await queryRunner.query(
-          `INSERT INTO topics (category_id, topic)
-           SELECT c.id, $2::varchar
-           FROM categories c
-           WHERE c.name = $1
-             AND NOT EXISTS (
-               SELECT 1 FROM topics t WHERE t.category_id = c.id AND t.topic = $2
-             )`,
-          [categoryName, topic],
-        );
-      }
-    }
-  }
-
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    for (const [categoryName, topics] of Object.entries(CATEGORIES)) {
-      await queryRunner.query(
-        `DELETE FROM topics t
-         USING categories c
-         WHERE t.category_id = c.id AND c.name = $1 AND t.topic = ANY($2)`,
-        [categoryName, topics],
-      );
-      await queryRunner.query(
-        `DELETE FROM categories c
-         WHERE c.name = $1 AND NOT EXISTS (SELECT 1 FROM topics t WHERE t.category_id = c.id)`,
-        [categoryName],
-      );
-    }
-  }
-}
+export const CATEGORIES: CategorySeed[] = Object.entries(CATEGORY_TOPICS).map(([name, topics], index) => ({
+  id: index + 1,
+  name,
+  topics: topics.map((topic) => ({ id: nextTopicId++, topic })),
+}));

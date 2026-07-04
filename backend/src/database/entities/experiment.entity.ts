@@ -4,11 +4,8 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
   Index,
 } from 'typeorm';
-import { Topic } from './topic.entity';
 import { CandidateConfig, JudgeConfig, ExperimentStatus } from '../../experiment/contracts/experiment.interface';
 
 @Entity('experiments')
@@ -20,12 +17,14 @@ export class Experiment {
   @Column({ type: 'uuid' })
   uuid!: string;
 
-  @Column({ name: 'topic_id' })
-  topicId!: number;
+  @Column({ type: 'varchar', length: 200 })
+  category!: string;
 
-  @ManyToOne(() => Topic)
-  @JoinColumn({ name: 'topic_id' })
-  topic!: Topic;
+  @Column({ type: 'varchar', length: 500 })
+  topic!: string;
+
+  @Column({ type: 'smallint' })
+  rounds!: number;
 
   @Column({ name: 'candidate_config', type: 'jsonb' })
   candidateConfig!: CandidateConfig[];

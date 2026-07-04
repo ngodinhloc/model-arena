@@ -13,4 +13,4 @@ class ExperimentEventHandler:
             "ExperimentEventHandler.handle: Received event",
             extra={"experimentId": event.experimentId, "eventName": event.eventName, "topic": event.topic},
         )
-        await self._agent_graph.ainvoke({"event": event})
+        await self._agent_graph.ainvoke({"event": event, "round": 1})

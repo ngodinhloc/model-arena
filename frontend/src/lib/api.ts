@@ -51,5 +51,5 @@ export function getAnalytics(): Promise<Analytics> {
 
 export function experimentWsUrl(uuid: string): string {
   const base = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
-  return `${base}/ws/experiments/${uuid}`;
+  return `${base}/ws/experiments?uuid=${uuid}`;
 }

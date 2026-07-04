@@ -9,7 +9,12 @@ sentences."""
 
 CANDIDATE_PROMPT = """Debate category: {category}
 Debate topic: "{topic}"
+Round {round_number} of {total_rounds}.
 
-Present your case {stance} this topic."""
+Debate transcript so far:
+{transcript}
+
+Present your case {stance} this topic. If this is not the opening round, directly
+engage with and rebut your opponent's most recent arguments."""
 
 STANCES = {1: "FOR", 2: "AGAINST"}

@@ -119,8 +119,10 @@ class ScoreService:
         )
 
         try:
-            llm = build_llm(settings.score_provider, settings.score_model, temperature=0).with_structured_output(
-                WinnerDecision
+            llm = (
+                build_llm(settings.score_provider, settings.score_model, temperature=0)
+                .with_structured_output(WinnerDecision, method="json_schema")
+                .with_retry(stop_after_attempt=3)
             )
             self._logger.info(
                 "ScoreService._decide: calling arbiter LLM",
