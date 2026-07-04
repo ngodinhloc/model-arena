@@ -16,6 +16,24 @@ interface WsUpdate {
   };
 }
 
+const STATUS_BADGE_STYLES: Record<string, string> = {
+  running: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+  completed: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  failed: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+};
+
+const STATUS_DOT_STYLES: Record<string, string> = {
+  running: "animate-pulse bg-amber-500",
+  completed: "bg-emerald-500",
+  failed: "bg-red-500",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  running: "Running",
+  completed: "Completed",
+  failed: "Failed",
+};
+
 export default function ExperimentPage({ params }: { params: Promise<{ uuid: string }> }) {
   const { uuid } = use(params);
   const [detail, setDetail] = useState<ExperimentDetail | null>(null);
@@ -47,6 +65,9 @@ export default function ExperimentPage({ params }: { params: Promise<{ uuid: str
                 setDetail((d) => (d ? { ...d, status: "completed" } : d));
                 window.dispatchEvent(new Event("experiment-completed"));
               }
+              if (update.event === "failed") {
+                setDetail((d) => (d ? { ...d, status: "failed" } : d));
+              }
               if (update.event === "error") {
                 setError(String(update.data));
               }
@@ -69,7 +90,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ uuid: str
   const scoreMessage = messages.find((m) => m.node === "score" && m.agentStatus === "hasReplied");
   const finalScore = scoreResponse ?? ((scoreMessage?.response ?? null) as ScoreResponse | null);
   const streamMessages = messages.filter((m) => m.node !== "score");
-  const isRunning = detail?.status === "running";
+  const status = detail?.status ?? "running";
   const candidate1 = detail?.candidateConfig?.find((c) => c.candidateNumber === 1);
   const candidate2 = detail?.candidateConfig?.find((c) => c.candidateNumber === 2);
 
@@ -90,18 +111,10 @@ export default function ExperimentPage({ params }: { params: Promise<{ uuid: str
                   {detail.category}
                 </span>
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    isRunning
-                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  }`}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_STYLES[status]}`}
                 >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      isRunning ? "animate-pulse bg-amber-500" : "bg-emerald-500"
-                    }`}
-                  />
-                  {isRunning ? "Running" : "Completed"}
+                  <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT_STYLES[status]}`} />
+                  {STATUS_LABELS[status]}
                 </span>
               </div>
               <h1 className="text-2xl font-bold leading-snug tracking-tight text-zinc-900 dark:text-zinc-100">

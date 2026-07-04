@@ -34,7 +34,21 @@
       "Bash(python3 -m py_compile app/agent/model_factory.py app/agent/score_graph.py app/agent/nodes/score_node.py app/container.py)",
       "Bash(curl -s http://localhost:8000/api/experiments/115dcb0f-b3f5-4ee5-a56d-202bc61c5a85)",
       "Bash(python3 -m py_compile app/agent/score_templates.py app/agent/nodes/score_node.py)",
-      "Bash(python3 -m py_compile app/agent/score_interfaces.py app/agent/nodes/score_node.py)"
+      "Bash(python3 -m py_compile app/agent/score_interfaces.py app/agent/nodes/score_node.py)",
+      "Bash(xargs -I{} echo {})",
+      "Bash(xargs -I{} sh -c 'echo ==={}===; cat {}')",
+      "Bash(npx nest *)",
+      "Bash(rm -rf dist)",
+      "Bash(docker exec *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/analytics)",
+      "Bash(curl -s http://localhost:8000/api/experiments/0a8b43f7-a4cf-47e2-af27-f068bfba19a4)",
+      "Bash(curl -s http://localhost:8000/api/experiments/b5cb8015-9eb7-4c0f-9485-a4d0aee798d5)",
+      "Bash(curl -s \"http://localhost:8000/api/experiments/86b64b0d-7af2-416d-8822-187ac830e01e\")",
+      "Bash(curl -s \"http://localhost:8000/api/experiments/6f84a0b9-378e-4d4a-97fc-6df8742c14fb\")",
+      "Bash(curl -s \"http://localhost:8000/api/experiments/ccc0151a-8079-4902-96e7-78f2d2742b8b\")",
+      "Bash(docker exec model-arena-postgres-1 psql -U arena -d arena -c ' *)",
+      "Bash(docker exec model-arena-postgres-1 psql -U arena -d arena -t -A -c ' *)",
+      "Bash(curl -s \"http://localhost:8000/api/experiments/4eebf710-76d8-4c1c-bc74-b91329b46953\")"
     ]
   }
 }

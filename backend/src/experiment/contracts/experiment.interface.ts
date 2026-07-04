@@ -22,6 +22,7 @@ export enum AgentStatus {
 export enum ExperimentStatus {
   running = 'running',
   completed = 'completed',
+  failed = 'failed',
 }
 
 export interface CandidateConfig {
@@ -102,4 +103,6 @@ export interface ExperimentEvent {
 export interface ExperimentCache extends ExperimentEvent {
   messages: Message[];
   agentStatus: AgentStatus;
+  updatedAt: string;
+  retryCount: number;
 }

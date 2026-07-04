@@ -17,6 +17,7 @@ export const PROVIDERS: ProviderSeed[] = [
       { id: 1, name: 'claude-opus-4-8' },
       { id: 2, name: 'claude-sonnet-5' },
       { id: 3, name: 'claude-haiku-4-5' },
+      { id: 4, name: 'claude-fable-5' },
     ],
   },
 ];

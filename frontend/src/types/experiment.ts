@@ -1,5 +1,5 @@
 export type AgentStatus = "isThinking" | "hasReplied";
-export type ExperimentStatus = "running" | "completed";
+export type ExperimentStatus = "running" | "completed" | "failed";
 
 export interface ProviderWithModels {
   id: number;
@@ -98,6 +98,8 @@ export interface ExperimentCache {
   judgeConfigs: JudgeConfig[];
   messages: Message[];
   agentStatus: AgentStatus;
+  updatedAt: string;
+  retryCount: number;
 }
 
 export interface ExperimentSummary {

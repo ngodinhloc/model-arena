@@ -90,3 +90,5 @@ class ExperimentEvent(BaseModel):
 
 class ExperimentCache(ExperimentEvent):
     agentStatus: AgentStatus = AgentStatus.is_thinking
+    updatedAt: str = ""
+    retryCount: int = 0

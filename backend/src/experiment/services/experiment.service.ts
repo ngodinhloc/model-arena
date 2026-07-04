@@ -76,6 +76,8 @@ export class ExperimentService {
       scoreCards: SCORE_CARD_NAMES.map((cardName) => ({ cardName, maxPoint: SCORE_CARD_MAX_POINT })),
       messages: [],
       agentStatus: AgentStatus.isThinking,
+      updatedAt: new Date().toISOString(),
+      retryCount: 0,
     };
     await this.redisService.setJson(this.redisKey(uuid), cache);
 

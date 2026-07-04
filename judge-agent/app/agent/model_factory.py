@@ -10,7 +10,6 @@ class ModelFactory:
         "claude-opus-4-8",
         "claude-sonnet-5",
         "claude-fable-5",
-        "claude-mythos",
     )
 
     def build(self, provider: str, model: str, temperature: float) -> BaseChatModel:

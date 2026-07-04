@@ -10,6 +10,7 @@ import { AgentStatus, ExperimentCache, ExperimentStatus } from '../contracts/exp
 
 const POLL_INTERVAL_MS = 500;
 const MAX_POLLS = 1200; // 10 min timeout
+const STATUS_CHECK_EVERY_N_POLLS = 4; // ~2s — cheap Postgres check for a recover-service-driven `failed` flip
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
 // @nestjs/platform-ws routes upgrades by an exact literal pathname match against
@@ -45,6 +46,12 @@ export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconne
       return;
     }
 
+    if (experiment.status === ExperimentStatus.failed) {
+      client.send(JSON.stringify({ event: 'failed', data: { uuid } }));
+      client.close(1000, 'Experiment failed');
+      return;
+    }
+
     this.startPolling(client, uuid);
   }
 
@@ -62,6 +69,19 @@ export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconne
 
       try {
         const cache = await this.redisService.getJson<ExperimentCache>(`experiment:${uuid}`);
+
+        // Redis alone can't tell us about a recover-service-driven `failed` flip (the cache
+        // may still look like a normal in-progress run, or be gone entirely), so periodically
+        // cross-check Postgres too.
+        if (!cache || polls % STATUS_CHECK_EVERY_N_POLLS === 0) {
+          const experiment = await this.experimentRepo.findOne({ where: { uuid } });
+          if (experiment?.status === ExperimentStatus.failed) {
+            this.clearSubscription(client);
+            client.send(JSON.stringify({ event: 'failed', data: { uuid } }));
+            client.close(1000, 'Experiment failed');
+            return;
+          }
+        }
         if (!cache) return;
 
         const payload = JSON.stringify({ event: 'experiment-update', data: cache });
