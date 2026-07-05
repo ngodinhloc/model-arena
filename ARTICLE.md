@@ -1,6 +1,6 @@
 # LLM-as-Judge: Designing a Multi-Agent Model Debate Platform with Auto-Recovery
 
-This article walks through the design of **ModelArena**, a platform that pits two LLM candidates against each other in a structured debate, has two LLM judges score the transcript against a fixed rubric, and a deterministic score agent tally the totals and ask an arbiter LLM to declare — and justify — a winner. The whole pipeline is a **choreography**: four independent services, each triggered by one RabbitMQ event, each publishing exactly one event forward, with no service that knows about the pipeline as a whole. That design is simple and decoupled, but it has a sharp edge — nothing is watching for a stuck experiment. The second half of this article is about the service built to close that gap: a recovery sweeper, and the two real bugs found while building and testing it.
+This article walks through the design of **ModelArena**, a platform that pits two LLM candidates against each other in a structured debate, has two LLM judges score the transcript against a fixed rubric, and a deterministic score agent tally the totals and ask an arbiter LLM to declare — and justify — a winner. The whole pipeline is a **choreography**: four independent services, each triggered by one RabbitMQ event, each publishing exactly one event forward, with no service that knows about the pipeline as a whole. That design is simple and decoupled, but it has a sharp edge — nothing is watching for a stuck experiment. The second half of this article is about the service built to close that gap: a recovery sweeper, and the three real bugs found while building, testing, and extending it.
 
 The focus is on two things above all — **LLM-as-judge** and **auto-recovery** — and the supporting decisions that make each of them work in practice:
 
@@ -13,7 +13,8 @@ The focus is on two things above all — **LLM-as-judge** and **auto-recovery** 
 - How to detect a stalled stage in a system with no orchestrator watching it, and why the obvious heuristic — look at the last message — is wrong
 - Why dispatch-by-payload-field, not by-transport-routing-key, is a trap that's easy to miss until you replay a message yourself
 - How to strip and safely re-run just the stuck stage without double-counting or discarding already-finished work
-- How to seed synthetic failures to test a recovery path that's inconvenient to trigger for real
+- Why a missing Redis cache isn't unrecoverable — Postgres already holds enough to restart the experiment from scratch, if the sweeper is willing to treat "zero progress" as just another starting state
+- How to manufacture a stalled experiment on demand, from real completed data, via a dedicated Test Auto Recovery page — instead of waiting for a real crash
 
 **Supporting architecture**
 - How to design a multi-stage pipeline as pure choreography — one topic exchange per stage, full event payloads, no central coordinator
@@ -25,7 +26,7 @@ The focus is on two things above all — **LLM-as-judge** and **auto-recovery** 
 
 ## Architecture Overview
 
-**Frontend** (Next.js 16, port 3000) — a New Experiment form (category/topic cascading selects, round count, two candidate configs, two judge configs, shared personas), a live experiment view that opens a WebSocket while the experiment runs, and an Analytics dashboard (Recharts bar charts) aggregated from every completed experiment.
+**Frontend** (Next.js 16, port 3000) — a New Experiment form (category/topic cascading selects, round count, two candidate configs, two judge configs, shared personas), a live experiment view that opens a WebSocket while the experiment runs, an Analytics dashboard (Recharts bar charts) aggregated from every completed experiment, an **Auto Run** page that batch-creates N randomized experiments in one click, and a **Test Auto Recovery** page that manufactures stalled experiments on demand to exercise the recovery sweeper.
 
 **Backend** (NestJS 11, port 8000) — the only entry and exit point of the pipeline. `POST /api/experiments` writes a Postgres row, writes an `ExperimentCache` to Redis, and publishes the first event. A WebSocket gateway polls Redis every 500ms and pushes updates to the browser. A single RabbitMQ consumer waits for the *last* event in the chain (`model_arena.scores.responded`) to persist the final `Result` row and flip the experiment to `completed`.
 
@@ -314,16 +315,68 @@ Every agent's own `publish_node.py` knows this and sets `eventName` explicitly b
 payload = event.model_copy(update={"eventName": PUBLISH_EVENT_NAME, "messages": messages})
 ```
 
-The recovery sweeper's first replay implementation didn't — it forwarded whatever `eventName` the cache already had, which for any replay past the very first hop was stale (left over from the original `model_arena.experiment.created`). The bug hid for an embarrassingly long time: the very first stage's replays happened to work, because the seed data's default `eventName` coincidentally matched candidate-agent's expected value, and (before Bug 1 was fixed) *every* stall eventually got routed back to a full candidate restart regardless of which stage was actually stuck — which incidentally always carries the right `eventName` by construction. Fixing Bug 1 removed that accidental cover, and judge/score replays started failing outright with `"No handler registered"` warnings in the target agent's logs. The fix is one line, once you know to look for it:
+The recovery sweeper's first replay implementation didn't — it forwarded whatever `eventName` the cache already had, which for any replay past the very first hop was stale (left over from the original `model_arena.experiment.created`). The bug hid for an embarrassingly long time: the very first stage's replays happened to work, because the seed data's default `eventName` coincidentally matched candidate-agent's expected value, and (before Bug 1 was fixed) *every* stall eventually got routed back to a full candidate restart regardless of which stage was actually stuck — which incidentally always carries the right `eventName` by construction. Fixing Bug 1 removed that accidental cover, and judge/score replays started failing outright with `"No handler registered"` warnings in the target agent's logs.
+
+The first fix set `eventName: target.routingKey` directly on the *persisted* cache before saving it — good enough to unblock dispatch, but it conflated two different things: what the cache represents (accumulated experiment state) and what's about to be published (an outbound event). The cache itself never needs `eventName` for recover-service's own logic — nothing here ever reads `cache.eventName` to make a decision. The cleaner shape moved it to construction time, building the outbound payload as its own object rather than mutating the cache:
 
 ```typescript
-const updated: ExperimentCache = {
-  ...cache,
-  eventName: target.routingKey, // must match what the target agent's handler map is keyed by
-  retryCount: cache.retryCount + 1,
-  updatedAt: new Date().toISOString(),
-};
+private buildEvent(cache: ExperimentCache, eventName: string) {
+  return {
+    eventName, // set here, once, for whatever's about to be published — never stored back onto the cache
+    experimentId: cache.experimentId,
+    category: cache.category,
+    topic: cache.topic,
+    rounds: cache.rounds,
+    candidateConfigs: cache.candidateConfigs,
+    judgeConfigs: cache.judgeConfigs,
+    scoreCards: cache.scoreCards,
+    messages: cache.messages,
+  };
+}
 ```
+
+### Recovering from a cache that isn't there at all
+
+The sweep has always had to handle one case besides "stale": Redis has *nothing* for this `uuid`, either because the TTL expired on a genuinely abandoned experiment or because backend crashed between the Postgres insert and the Redis write in `createExperiment`. The original logic treated this as unrecoverable and marked the experiment `failed` outright — reasonable-sounding, since without a cache there's no `messages` array to know which stage to resume.
+
+That reasoning has a gap: recover-service doesn't need to know which stage to *resume*, because Postgres already has everything needed to start the experiment over from stage one — `category`, `topic`, `rounds`, `candidateConfig`, `judgeConfig` all live on the `experiments` row backend wrote at creation time. A missing cache isn't unrecoverable, it's just equivalent to zero progress — the same starting state as a brand-new experiment.
+
+Acting on that meant widening recover-service's own `Experiment` entity, which had deliberately mirrored only the columns the sweeper touched (`id`, `uuid`, `status`, `modifiedAt` — the service runs with `synchronize: false` and never issues DDL, so this is purely a matter of mapping more of the *already-existing* columns, not a migration):
+
+```typescript
+buildFreshCache(experiment: Experiment): ExperimentCache {
+  return {
+    eventName: EVENT_EXPERIMENT_CREATED,
+    experimentId: experiment.uuid,
+    category: experiment.category,
+    topic: experiment.topic,
+    rounds: experiment.rounds,
+    candidateConfigs: experiment.candidateConfig,
+    judgeConfigs: experiment.judgeConfig,
+    scoreCards: SCORE_CARD_NAMES.map((cardName) => ({ cardName, maxPoint: SCORE_CARD_MAX_POINT })),
+    messages: [],
+    agentStatus: AgentStatus.isThinking,
+    updatedAt: new Date().toISOString(),
+    retryCount: 0,
+  };
+}
+```
+
+The nice part is what happens *after* building it: rather than writing a bespoke "publish the created event" path, the fresh cache is handed straight to the same `replayStalledStage` used for every other stall. `determineStuckNode` sees zero completed candidate messages against `rounds × candidateConfigs.length` expected, returns `'candidate'` — exactly the stage a brand-new experiment should start at — and the existing stripping/publish/retry-bump mechanics take it from there. No new code path, just a new way to arrive at one that already existed.
+
+### Bug 3 — A cache built from nothing still needs `eventName`
+
+Every agent's own `ExperimentCache` (Python) extends `ExperimentEvent`, which requires `eventName` — the same field Bug 2 was about, but at a different layer. Every *other* cache mutation in recover-service works by spreading `{...cache}` from a blob loaded out of Redis, and that blob always originally came from backend, which writes `eventName` at creation time. The field rides along at runtime even though recover-service's own TypeScript `ExperimentCache` interface didn't declare it — nothing was checking, because `{...cache}` doesn't care about extra untyped properties.
+
+`buildFreshCache` was the first code path to construct a cache from nothing rather than mutate one already loaded, and there was no blob to inherit the field from. The first version of it omitted `eventName` entirely, and candidate-agent rejected the replayed event outright:
+
+```
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ExperimentCache
+eventName
+  Field required [type=missing, input_value={'experimentId': '...', 'retryCount': 1}, input_type=dict]
+```
+
+Caught live, by deliberately deleting the Redis key for a real in-flight test experiment and watching the next sweep tick: the first attempt logged `RabbitMQPublisherService.publish: Published`, and candidate-agent immediately threw the validation error above instead of picking up the event. The fix adds `eventName` back to recover-service's own `ExperimentCache` type — not because recover-service's replay logic ever reads it, but so the compiler forces every from-scratch construction to supply it — and `buildFreshCache` sets it to `EVENT_EXPERIMENT_CREATED`, exactly what backend would have written for a real new experiment. Deleting the Redis key and re-running the same test afterward showed the corrected sequence: cache rebuilt, event published, candidate-agent received it cleanly and started processing.
 
 ### Giving up
 
@@ -342,7 +395,57 @@ The frontend needed a small matching change — `ExperimentStatus` gained a `fai
 
 ## Step 9 — Testing a Recovery Path You Can't Easily Trigger
 
-Waiting for a real crash to validate a recovery sweeper is slow and non-repeatable. Instead, stalled experiments were seeded directly: a Postgres row with `status: running`, and a Redis cache with `updatedAt` set far enough in the past to already be stale, ending in an unfinished message for whichever stage the scenario needs to simulate — one seed for "stuck at candidate," one for "stuck at judge," one for "stuck at score." The very first version used placeholder text ("Argument A from candidate 1") for the "already completed" prior stages, which was good enough to exercise the replay/stripping mechanics, but produced meaningless judge scores (real judges correctly scored contentless placeholder text as 0/0). Pulling a real candidate/judge exchange out of an actual completed experiment's `results` row and reusing it as seed content fixed that — the same recovery mechanics, but exercised against real debate transcripts and real, meaningful judge scores.
+Waiting for a real crash to validate a recovery sweeper is slow and non-repeatable. The first version of the fix was a one-off script that seeded a stalled experiment directly: a Postgres row with `status: running`, and a Redis cache with `updatedAt` set far enough in the past to already be stale, ending in an unfinished message for whichever stage the scenario needed to simulate. It used placeholder text ("Argument A from candidate 1") for the "already completed" prior stages, which was good enough to exercise the replay/stripping mechanics, but produced meaningless judge scores — real judges correctly scored contentless placeholder text as 0/0.
+
+That script became a proper page instead of staying a script: **Test Auto Recovery** (`/test-auto-recovery`) and its `POST /api/test-recover` endpoint. Given a `count` and a `stallState` (`candidate` / `judge` / `score`), the backend samples that many random *real, completed* experiments — sidestepping the placeholder-content problem entirely, since the seed content is now an actual debate transcript with real, meaningful judge scores — and for each one:
+
+- generates a new UUID and inserts a fresh Postgres row with `status: running`, copying `category`/`topic`/`rounds`/`candidateConfig`/`judgeConfig` straight off the source row;
+- rebuilds the `messages` array from the source's stored `results`, stripped back to just before the target stage — empty for `candidate`, candidate-only for `judge`, candidate+judge for `score` — so `determineStuckNode` (Step 8, Bug 1) lands on exactly the intended stage;
+- writes that as a fresh `ExperimentCache` to Redis with `updatedAt` backdated well past `STALE_THRESHOLD_SECONDS` and `retryCount: 0`.
+
+The one deliberate omission: **no RabbitMQ event is published.** The whole point of the exercise is that recover-service's own sweep — not a helpfully-addressed message from whatever created the experiment — is what has to notice the stall and repair it. Within one `SWEEP_INTERVAL_SECONDS` tick, the same `checkExperiment` path a real crash would hit picks up the manufactured stall, replays the right stage, and the experiment finishes for real.
+
+---
+
+## Step 10 — Stress-Testing the Happy Path Finds a Different Kind of Bug
+
+Not every useful testing tool is aimed at the failure path. **Auto Run** (`/auto-run`) does the opposite of Test Auto Recovery: instead of manufacturing a stall, it fires `N` ordinary `POST /api/experiments` calls back to back, each with a randomly chosen topic/category and randomly chosen provider/model/temperature per candidate and judge. The point is volume and variety — generating enough real experiments, across enough model combinations, to populate the Analytics dashboard and to shake out anything that only shows up under concurrent load.
+
+Running a batch of ten surfaced exactly that kind of bug, in `judge-agent`, with an empty-looking traceback:
+
+```
+langchain_core.exceptions.OutputParserException: Invalid json output:
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+```
+
+The judge's structured-output call was returning literally nothing — not malformed JSON, no JSON at all. The failures correlated with which model Auto Run had randomly assigned as judge: always `claude-sonnet-5` or `claude-fable-5`, never `claude-opus-4-8`. The three models differ in one relevant way: whether extended thinking is on by default when the `thinking` parameter is omitted entirely, which is exactly what `judge-agent`'s `ModelFactory.build()` did — it never set `thinking` at all.
+
+| Model | `thinking` omitted |
+|---|---|
+| `claude-opus-4-8` | off |
+| `claude-sonnet-5` | **adaptive, on** |
+| `claude-fable-5` | **always on, cannot be disabled** |
+
+With `max_tokens: 4096` shared between reasoning and the final structured answer, a judge call on Sonnet 5 or Fable 5 could spend the entire budget thinking and hit `max_tokens` before emitting any answer text — an empty response the JSON parser then had nothing to parse. Opus 4.8 never had the problem because thinking stays off there by default.
+
+The fix pins `thinking` and `effort` explicitly, only for the models where it matters, rather than raising `max_tokens` across the board and hoping it's always enough headroom:
+
+```python
+ADAPTIVE_THINKING_PREFIXES = ("claude-sonnet-5", "claude-fable-5")
+
+def build(self, provider: str, model: str, temperature: float) -> BaseChatModel:
+    kwargs: dict = {"max_tokens": 4096}
+    if self.supports_temperature(provider, model):
+        kwargs["temperature"] = temperature
+    if provider == "anthropic" and model.startswith(self.ADAPTIVE_THINKING_PREFIXES):
+        kwargs["thinking"] = {"type": "adaptive"}
+        kwargs["effort"] = "low"
+    return init_chat_model(model, model_provider=provider, **kwargs)
+```
+
+`effort: "low"` keeps reasoning shallow enough that it reliably leaves room for the actual answer inside the same 4096-token budget, on the two models where thinking can't simply be left off. The same `ModelFactory` shape is duplicated in `candidate-agent` and `score-agent` (Step 6's cross-language duplication tradeoff, one language down), so the fix was applied identically in all three rather than only where the bug happened to be caught first.
+
+The lesson isn't really about this one Anthropic API detail — it's that a tool built to test one kind of failure (stalls) found a completely different kind of bug (token-budget exhaustion) simply by generating enough real traffic across enough model combinations, faster than any hand-written test case would have.
 
 ---
 
@@ -428,9 +531,15 @@ Full transcripts backing this example: `candidate_responses.json`, `judge_respon
 
 **Strip only the stuck stage before replaying.** Every agent's graph re-runs its entire internal sequence unconditionally on any invocation; leaving old completed messages for that stage in the cache would duplicate them after a replay, and score-agent sums judge points across *every* judge message with no de-duplication — duplicates would silently double-count a candidate's score. Stripping first makes a replay a clean redo of exactly one stage.
 
+**A missing cache is a restart, not a dead end.** The original sweep treated "no Redis cache" as unrecoverable and gave up. But Postgres already carries everything a from-scratch experiment needs, so a missing cache is just zero progress — indistinguishable from a brand-new experiment — and gets handed to the exact same `replayStalledStage` mechanics as any other stall rather than a bespoke recovery path.
+
 **Contracts duplicated across four codebases, deliberately.** A shared package would prevent the specific class of bug this project hit (a field silently vanishing because one of four copies didn't declare it), but at the cost of a cross-language build/publish step for every contract change. The project accepts the duplication risk and manages it with an explicit convention (`AGENTS.md`) instead of tooling.
 
 **The arbiter always runs, even on a tie.** Score totals are computed deterministically, but the winner is never assigned by comparing two integers in code — an LLM call is always made to produce a justification, and a tied total is a case the arbiter must explicitly resolve and explain rather than a code path that silently defaults to candidate 1.
+
+**Recovery testing as a page, not a script.** A one-off seeding script validated the recovery sweeper once; turning it into `POST /api/test-recover` plus a Test Auto Recovery page made it repeatable, sourced from real completed transcripts instead of placeholder text, and — critically — still silent on RabbitMQ, so the sweep itself, not a return-addressed message, is what's actually being tested.
+
+**Stress-testing the happy path is its own kind of test.** Auto Run wasn't built to find bugs — it was built to generate Analytics data — but firing enough real experiments across enough random model combinations surfaced a token-budget bug (Step 10) that a single hand-written test case never would have, simply by exercising more of the model matrix than anyone would think to write out by hand.
 
 ---
 

@@ -5,7 +5,7 @@ A **choreographed, event-driven** platform for benchmarking LLMs against each ot
 Two things this project is specifically built to demonstrate:
 
 - **LLM-as-judge** — judging is split into a deterministic step (summing rubric points) and a separate LLM step (an arbiter that declares and justifies a winner, even on a tied total) rather than trusting one LLM call to both score and decide. See [Score Agent](#score-agent-port-8003) and the [example run](#example-a-real-debate) below.
-- **Auto-recovery** — because the pipeline has no orchestrator, nothing else would notice a stalled stage. `recover-service` is a standalone sweeper that detects stuck experiments and safely replays only the stuck stage. See [Recover Service](#recover-service-port-8004).
+- **Auto-recovery** — because the pipeline has no orchestrator, nothing else would notice a stalled stage. `recover-service` is a standalone sweeper that detects stuck experiments and safely replays only the stuck stage. See [Recover Service](#recover-service-port-8004). The frontend's **Test Auto Recovery** page lets you manufacture a stall on demand instead of waiting for a real crash — see [Frontend](#frontend-port-3000).
 
 ---
 
@@ -114,6 +114,7 @@ Every event carries the **full `ExperimentEvent` payload** — `experimentId`, `
 | `POST` | `/api/experiments` | Create experiment row (`status: running`) + write `ExperimentCache` to Redis + publish `model_arena.experiment.created`; returns `{ uuid }` |
 | `GET` | `/api/experiments` | List experiments, most recent first |
 | `GET` | `/api/experiments/:uuid` | One experiment — live from Redis while `running`, joined with `results` once `completed`/`failed` |
+| `POST` | `/api/test-recover` | Recovery testing: samples `count` (1–5) random `completed` experiments, clones each as a fresh `running` row with `messages` stripped back to just before `stallState` (`candidate`/`judge`/`score`), and writes a backdated `ExperimentCache` to Redis — no RabbitMQ publish, so recover-service's own sweep is what discovers and repairs it; returns the created experiments |
 | `GET` | `/api/analytics` | Aggregated win-rate / score-card / judge stats across all completed experiments |
 | `GET` | `/api/models` | Providers with nested models |
 | `GET` | `/api/categories` | Category list |
@@ -198,7 +199,7 @@ A choreographed pipeline with no orchestrator has no single place that knows an 
 
 Every `SWEEP_INTERVAL_SECONDS` (default 30) it fetches every Postgres experiment still `status: running`, and for each one (in bounded-concurrency batches, each guarded by a **per-experiment Redis lock** so overlapping ticks or future replicas never act on the same experiment twice):
 
-- **Redis cache missing/expired** → progress unrecoverable → mark `failed`.
+- **Redis cache missing/expired** → rebuild a fresh `ExperimentCache` straight from the Postgres row (same shape `POST /api/experiments` would have written) and restart the pipeline from scratch by republishing `model_arena.experiment.created` — a missing cache means no in-flight progress to lose, so this is just the create-experiment flow re-run rather than a dead end.
 - **Cache present but stale** (`updatedAt` older than `STALE_THRESHOLD_SECONDS`, default 120) and `retryCount >= MAX_RETRIES` (default 3) → give up, mark `failed`.
 - **Cache present, stale, retries remaining**:
   - If the pipeline actually finished (`agentStatus: hasReplied`) but Postgres never flipped to `completed` — backend itself dropped the terminal event — replay `model_arena.scores.responded` directly.
@@ -216,6 +217,8 @@ handler = self._handler_map.get(payload.get("eventName"))
 
 So a naive replay that just republishes the stale cache (still carrying whatever `eventName` it last had) gets silently dropped by the target agent with a "no handler registered" warning — the replay must set `eventName` to match what the target stage's handler map expects, in addition to publishing on the right exchange/routing key.
 
+**A from-scratch cache still needs `eventName`.** Every agent's own `ExperimentCache` (Python) extends `ExperimentEvent`, which requires `eventName` — Pydantic rejects a cache blob missing it. Every cache mutation elsewhere in recover-service spreads `{...cache}` from a blob that originally came from backend (which always writes it), so the field rides along even though recover-service's own TypeScript type doesn't declare it. Building a cache from nothing (the missing-cache path above) has no such blob to spread from, so `ExperimentManager.buildFreshCache` sets `eventName: EVENT_EXPERIMENT_CREATED` explicitly — omitting it here reproduces the exact `"Field required"` validation error the previous bullet's fix was for, just one layer up.
+
 **Locking is per-experiment, not per-sweep-tick.** A single lock for the whole sweep would force a large backlog of stalled experiments to be processed one at a time, and any tick that outran its own lock TTL would let a second tick start concurrently on the same backlog. Locking at the experiment level (`recover:sweep:lock:{uuid}`, `SET ... PX ttl NX`) lets an arbitrarily large batch of stale experiments be checked in parallel while still guaranteeing no two ticks — or future replicas — act on the same experiment twice.
 
 **Known limitation:** candidate-agent's graph always starts at round 1 on any invocation, so a replay of a mid-round candidate stall redoes every round, not just the unfinished one — wasteful, but not incorrect, since stripping keeps the message list clean either way.
@@ -228,8 +231,10 @@ Config: `STALE_THRESHOLD_SECONDS`, `SWEEP_INTERVAL_SECONDS`, `MAX_RETRIES` (env 
 
 - **New Experiment** (`/`) — Category → Topic cascading selects, a 1–5 round picker, a static score-card legend, two `AgentConfigCard`s for candidates (provider → model → temperature) plus a shared candidate persona textarea, and the same for two judges. Submitting `POST /api/experiments` and redirects to `/experiments/:uuid`.
 - **Experiment view** (`/experiments/:uuid`) — opens the WebSocket while `running`, renders candidate argument cards and judge score-sheets as they stream in, shows a "Thinking…" state per in-flight actor, and a winner banner once the score arrives. Renders a red "Failed" badge (no WS) for experiments recover-service gave up on.
+- **Auto Run** (`/auto-run`) — picks a run count (5/10/20/30), then fires that many `POST /api/experiments` calls with a randomized topic/category and randomized candidate/judge provider, model, and temperature per run. Each created experiment renders as a card (category, topic, candidate 1 vs. candidate 2) linking to its live view — useful for generating Analytics data or stress-testing the pipeline under concurrent load.
+- **Test Auto Recovery** (`/test-auto-recovery`) — picks a count (1–5) and a stall state (Candidate/Judge/Score), then calls `POST /api/test-recover` and renders the resulting stalled experiments as cards. Each one is picked up and finished for real by recover-service's sweep within `SWEEP_INTERVAL_SECONDS` — no separate "fake" completion path.
 - **Analytics** (`/analytics`) — win-rate table plus four Recharts bar charts: wins by category, winner by score card, average score per score card, average score by judge.
-- **Sidebar** — collapsible left rail with "New Experiment", "Analytics", and an expandable history list from `GET /api/experiments`.
+- **Sidebar** — collapsible left rail with "New Experiment", "Analytics", "Auto Run", "Test Auto Recovery", and an expandable history list from `GET /api/experiments`.
 
 ---
 

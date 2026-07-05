@@ -15,9 +15,14 @@ import {
   NodeName,
 } from '../contracts/experiment.interface';
 
+interface ReplayTarget {
+  exchange: string;
+  routingKey: string;
+}
+
 // Where to replay a stalled stage. The target's queue reloads state from the (stripped)
 // Redis cache, so republishing here re-runs that stage cleanly from scratch.
-const STAGE_REPLAY_TARGETS: Record<NodeName, { exchange: string; routingKey: string }> = {
+const STAGE_REPLAY_TARGETS: Record<NodeName, ReplayTarget> = {
   candidate: { exchange: EXCHANGE_EXPERIMENT, routingKey: EVENT_EXPERIMENT_CREATED },
   judge: { exchange: EXCHANGE_CANDIDATES, routingKey: EVENT_CANDIDATES_RESPONDED },
   score: { exchange: EXCHANGE_JUDGES, routingKey: EVENT_JUDGES_RESPONDED },
@@ -25,7 +30,7 @@ const STAGE_REPLAY_TARGETS: Record<NodeName, { exchange: string; routingKey: str
 
 // If the pipeline fully finished (Redis says hasReplied) but Postgres never flipped to
 // completed, backend itself dropped/crashed on the terminal event — replay that instead.
-const FINAL_REPLAY_TARGET = { exchange: EXCHANGE_SCORES, routingKey: EVENT_SCORES_RESPONDED };
+const FINAL_REPLAY_TARGET: ReplayTarget = { exchange: EXCHANGE_SCORES, routingKey: EVENT_SCORES_RESPONDED };
 
 // Owns the mechanics of re-publishing a stalled experiment: picking the right exchange,
 // making the replay idempotent, and bumping retry/updatedAt bookkeeping in the cache.
@@ -92,24 +97,33 @@ export class ReplayStrategy {
     await this.bumpRetryAndPublish(cache, FINAL_REPLAY_TARGET);
   }
 
-  private async bumpRetryAndPublish(
-    cache: ExperimentCache,
-    target: { exchange: string; routingKey: string },
-  ): Promise<void> {
-    const updated: ExperimentCache = {
+  private async bumpRetryAndPublish(cache: ExperimentCache, target: ReplayTarget): Promise<void> {
+    const updatedCache: ExperimentCache = {
       ...cache,
-      // Every agent's MessageProcessor dispatches its handler by looking up payload.eventName
-      // in a map keyed by the consuming routing key (see publish_node.py in each agent, which
-      // sets this identically) — NOT by the RabbitMQ routing key the message arrived on. Leaving
-      // the original eventName in place means the target agent silently drops the replay with
-      // "No handler registered".
-      eventName: target.routingKey,
       retryCount: cache.retryCount + 1,
       updatedAt: new Date().toISOString(),
     };
-    await this.experimentManager.saveCache(updated);
+    await this.experimentManager.saveCache(updatedCache);
 
-    const { agentStatus: _agentStatus, updatedAt: _updatedAt, retryCount: _retryCount, ...event } = updated;
-    await this.rabbitMQPublisher.publish(target.exchange, target.routingKey, event);
+    await this.rabbitMQPublisher.publish(target.exchange, target.routingKey, this.buildEvent(updatedCache, target.routingKey));
+  }
+
+  // Every agent's MessageProcessor dispatches its handler by looking up payload.eventName
+  // in a map keyed by the consuming routing key (see publish_node.py in each agent, which
+  // sets this identically) — NOT by the RabbitMQ routing key the message arrived on. The
+  // recovery-only bookkeeping fields (agentStatus/updatedAt/retryCount) stay out of the
+  // payload since downstream agents don't expect them.
+  private buildEvent(cache: ExperimentCache, eventName: string) {
+    return {
+      eventName,
+      experimentId: cache.experimentId,
+      category: cache.category,
+      topic: cache.topic,
+      rounds: cache.rounds,
+      candidateConfigs: cache.candidateConfigs,
+      judgeConfigs: cache.judgeConfigs,
+      scoreCards: cache.scoreCards,
+      messages: cache.messages,
+    };
   }
 }

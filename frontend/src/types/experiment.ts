@@ -102,6 +102,17 @@ export interface ExperimentCache {
   retryCount: number;
 }
 
+export type StallState = "candidate" | "judge" | "score";
+
+export interface StalledExperiment {
+  uuid: string;
+  topic: string;
+  category: string;
+  stallState: StallState;
+  candidate1: { provider: string; model: string };
+  candidate2: { provider: string; model: string };
+}
+
 export interface ExperimentSummary {
   uuid: string;
   topic: string;

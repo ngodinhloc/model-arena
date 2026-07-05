@@ -13,6 +13,21 @@ export class Experiment {
   @Column({ type: 'uuid' })
   uuid!: string;
 
+  @Column({ type: 'varchar', length: 200 })
+  category!: string;
+
+  @Column({ type: 'varchar', length: 500 })
+  topic!: string;
+
+  @Column({ type: 'smallint' })
+  rounds!: number;
+
+  @Column({ name: 'candidate_config', type: 'jsonb' })
+  candidateConfig!: unknown[];
+
+  @Column({ name: 'judge_config', type: 'jsonb' })
+  judgeConfig!: unknown[];
+
   @Column({ type: 'varchar', length: 20, default: ExperimentStatus.running })
   status!: ExperimentStatus;
 

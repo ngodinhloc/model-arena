@@ -48,7 +48,33 @@
       "Bash(curl -s \"http://localhost:8000/api/experiments/ccc0151a-8079-4902-96e7-78f2d2742b8b\")",
       "Bash(docker exec model-arena-postgres-1 psql -U arena -d arena -c ' *)",
       "Bash(docker exec model-arena-postgres-1 psql -U arena -d arena -t -A -c ' *)",
-      "Bash(curl -s \"http://localhost:8000/api/experiments/4eebf710-76d8-4c1c-bc74-b91329b46953\")"
+      "Bash(curl -s \"http://localhost:8000/api/experiments/4eebf710-76d8-4c1c-bc74-b91329b46953\")",
+      "Bash(npx eslint *)",
+      "Bash(lsof -i :3000 -sTCP:LISTEN)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(docker info *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/auto-run)",
+      "Bash(command -v chromium-cli)",
+      "Read(//usr/local/bin/**)",
+      "Bash(npx --yes playwright --version)",
+      "Bash(node -e ' *)",
+      "Bash(npx --yes playwright install chromium --with-deps)",
+      "Bash(npm init *)",
+      "Bash(npx playwright *)",
+      "Bash(rm -f /private/tmp/claude-501/-Users-kenngo-Documents-Projects-model-arena/c1a73426-9caa-492d-8da1-03ac1ea8d84f/scratchpad/screenshot-*.png /private/tmp/claude-501/-Users-kenngo-Documents-Projects-model-arena/c1a73426-9caa-492d-8da1-03ac1ea8d84f/scratchpad/drive*.js)",
+      "Bash(awk '/2026-07-05T05:20:5[0-4]/{print}')",
+      "Bash(xargs -I{} sh -c 'echo ==={}; cat {}')",
+      "Bash(rm -f /private/tmp/claude-501/-Users-kenngo-Documents-Projects-model-arena/c1a73426-9caa-492d-8da1-03ac1ea8d84f/scratchpad/recovery-*.png /private/tmp/claude-501/-Users-kenngo-Documents-Projects-model-arena/c1a73426-9caa-492d-8da1-03ac1ea8d84f/scratchpad/drive4.js)",
+      "Bash(curl -s -X POST http://localhost:8000/api/test-recover -H \"Content-Type: application/json\" -d '{\"count\":1,\"stallState\":\"score\"}')",
+      "Bash(curl -s -X POST http://localhost:8000/api/test-recover -H \"Content-Type: application/json\" -d '{\"count\":1,\"stallState\":\"candidate\"}')",
+      "Bash(UUID=$\\(cat /tmp/test_uuid.txt\\) *)",
+      "Read(//private/tmp/**)",
+      "Bash(xargs -I{} sh -c 'echo \"--- {} ---\"; cat {}')",
+      "Bash(UUID=$\\(cat /tmp/test_uuid2.txt\\) *)"
+    ],
+    "additionalDirectories": [
+      "/private/tmp/claude-501/-Users-kenngo-Documents-Projects-model-arena/c1a73426-9caa-492d-8da1-03ac1ea8d84f/scratchpad"
     ]
   }
 }

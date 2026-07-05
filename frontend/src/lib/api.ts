@@ -5,6 +5,8 @@ import {
   ExperimentDetail,
   ExperimentSummary,
   ProviderWithModels,
+  StalledExperiment,
+  StallState,
   Topic,
 } from "@/types/experiment";
 
@@ -47,6 +49,14 @@ export function getExperiment(uuid: string): Promise<ExperimentDetail> {
 
 export function getAnalytics(): Promise<Analytics> {
   return request("/api/analytics");
+}
+
+export function testRecover(count: number, stallState: StallState): Promise<StalledExperiment[]> {
+  return request("/api/test-recover", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ count, stallState }),
+  });
 }
 
 export function experimentWsUrl(uuid: string): string {

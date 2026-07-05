@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { PanelLeft, PanelRight, Plus, BarChart3, ChevronDown, ChevronRight, Swords } from "lucide-react";
+import { PanelLeft, PanelRight, Plus, BarChart3, ChevronDown, ChevronRight, Swords, Repeat, LifeBuoy } from "lucide-react";
 import { getExperiments } from "@/lib/api";
 import { ExperimentSummary } from "@/types/experiment";
 
@@ -67,6 +67,20 @@ export default function Sidebar() {
           >
             <BarChart3 size={15} className="shrink-0" />
             {isOpen && "Analytics"}
+          </button>
+          <button
+            onClick={() => router.push("/auto-run")}
+            className={navItemClass(pathname === "/auto-run")}
+          >
+            <Repeat size={15} className="shrink-0" />
+            {isOpen && "Auto Run"}
+          </button>
+          <button
+            onClick={() => router.push("/test-auto-recovery")}
+            className={navItemClass(pathname === "/test-auto-recovery")}
+          >
+            <LifeBuoy size={15} className="shrink-0" />
+            {isOpen && "Test Auto Recovery"}
           </button>
         </div>
 

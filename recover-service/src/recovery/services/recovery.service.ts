@@ -40,10 +40,12 @@ export class RecoveryService {
       const cache = await this.experimentManager.loadCache(experiment.uuid);
 
       if (!cache) {
-        this.logger.warn('RecoveryService.checkExperiment: cache missing/expired, marking failed', {
-          uuid: experiment.uuid,
-        });
-        await this.experimentManager.markFailed(experiment);
+        this.logger.warn(
+          'RecoveryService.checkExperiment: cache missing/expired, rebuilding and restarting as a new experiment',
+          { uuid: experiment.uuid },
+        );
+        const freshCache = this.experimentManager.buildFreshCache(experiment);
+        await this.replayStrategy.replayStalledStage(freshCache);
         return;
       }
 

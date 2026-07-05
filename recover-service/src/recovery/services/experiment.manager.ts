@@ -3,7 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Experiment } from '../../database/entities/experiment.entity';
 import { RedisService } from '../../redis/services/redis.service';
-import { ExperimentCache, ExperimentStatus } from '../contracts/experiment.interface';
+import {
+  AgentStatus,
+  EVENT_EXPERIMENT_CREATED,
+  ExperimentCache,
+  ExperimentStatus,
+  SCORE_CARD_MAX_POINT,
+  SCORE_CARD_NAMES,
+} from '../contracts/experiment.interface';
 
 const CACHE_TTL_SECONDS = 7200;
 
@@ -48,5 +55,25 @@ export class ExperimentManager {
 
   async markFailed(experiment: Experiment): Promise<void> {
     await this.experimentRepo.update({ id: experiment.id }, { status: ExperimentStatus.failed });
+  }
+
+  // Redis had nothing at all for this experiment (cache missing/expired) — rebuild a
+  // brand-new cache from the Postgres row, exactly as backend's createExperiment would have
+  // written it, so replaying it re-kicks off the pipeline from scratch instead of giving up.
+  buildFreshCache(experiment: Experiment): ExperimentCache {
+    return {
+      eventName: EVENT_EXPERIMENT_CREATED,
+      experimentId: experiment.uuid,
+      category: experiment.category,
+      topic: experiment.topic,
+      rounds: experiment.rounds,
+      candidateConfigs: experiment.candidateConfig,
+      judgeConfigs: experiment.judgeConfig,
+      scoreCards: SCORE_CARD_NAMES.map((cardName) => ({ cardName, maxPoint: SCORE_CARD_MAX_POINT })),
+      messages: [],
+      agentStatus: AgentStatus.isThinking,
+      updatedAt: new Date().toISOString(),
+      retryCount: 0,
+    };
   }
 }
