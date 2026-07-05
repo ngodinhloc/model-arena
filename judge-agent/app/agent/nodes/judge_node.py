@@ -53,7 +53,7 @@ class JudgeNode:
             )),
         ])
 
-        await self._manager.complete_message(event.experimentId, actor, verdict.scoreSheets)
+        await self._manager.set_reply(event.experimentId, actor, verdict.scoreSheets)
         return {}
 
     @staticmethod

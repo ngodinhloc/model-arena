@@ -44,7 +44,7 @@ class ExperimentManager:
         cache.agentStatus = AgentStatus.is_thinking
         await self.save(experiment_id, cache)
 
-    async def complete_message(
+    async def set_reply(
         self,
         experiment_id: str,
         actor: str,

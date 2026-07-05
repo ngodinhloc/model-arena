@@ -25,8 +25,8 @@ class CandidateNode:
     async def __call__(self, state: CandidateState) -> dict:
         event = state["event"]
         round_number = state["round"]
-        cfg = next(c for c in event.candidateConfigs if c.candidateNumber == self._number)
-        actor = f"Candidate {self._number} ({cfg.provider}/{cfg.model})"
+        config = next(c for c in event.candidateConfigs if c.candidateNumber == self._number)
+        actor = f"Candidate {self._number} ({config.provider}/{config.model})"
         stance = STANCES[self._number]
 
         await self._manager.append_thinking(event.experimentId, NodeName.candidate, actor)
@@ -35,7 +35,7 @@ class CandidateNode:
         transcript = self._format_transcript(cache.messages if cache else [])
 
         llm = (
-            self._model_factory.build(cfg.provider, cfg.model, cfg.temperature)
+            self._model_factory.build(config.provider, config.model, config.temperature)
             .with_structured_output(CandidateResponse, method="json_schema")
             .with_retry(stop_after_attempt=3)
         )
@@ -45,7 +45,7 @@ class CandidateNode:
         )
         response: CandidateResponse = await llm.ainvoke([
             SystemMessage(content=CANDIDATE_SYSTEM.format(
-                candidate_number=self._number, persona=cfg.persona, stance=stance,
+                candidate_number=self._number, persona=config.persona, stance=stance,
             )),
             HumanMessage(content=CANDIDATE_PROMPT.format(
                 category=event.category,
@@ -57,7 +57,7 @@ class CandidateNode:
             )),
         ])
 
-        await self._manager.complete_message(event.experimentId, actor, response)
+        await self._manager.set_reply(event.experimentId, actor, response)
         return {}
 
     @staticmethod

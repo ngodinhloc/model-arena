@@ -37,7 +37,7 @@ class ScoreNode:
 
         score_response = await self._score(event, messages)
 
-        await self._manager.complete_message(event.experimentId, actor, score_response, final=True)
+        await self._manager.set_reply(event.experimentId, actor, score_response, final=True)
         self._logger.info(
             "ScoreNode: scores recorded",
             extra={

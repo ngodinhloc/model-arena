@@ -12,6 +12,22 @@ from app.services.experiment_manager import ExperimentManager
 
 
 class CandidateGraph:
+    """Builds the LangGraph state machine that drives one candidate debate.
+
+    Flow::
+
+        START -> candidate_1 -> candidate_2 -> [round < event.rounds?]
+                    ^                              |            |
+                    |                             yes           no
+                    |                              |            v
+                    +------------ advance_round <---+         publish -> END
+
+    Each round runs candidate_1 then candidate_2 in sequence. After both have
+    replied, _route_after_candidates decides whether to loop back for another
+    round (via advance_round, which increments state["round"]) or to publish
+    the final transcript and end the graph.
+    """
+
     def __init__(
         self,
         manager: ExperimentManager,
