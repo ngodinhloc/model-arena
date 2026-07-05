@@ -1,0 +1,136 @@
+[
+  {
+    "node": "judge",
+    "actor": "Judge 1 (anthropic/claude-sonnet-5)",
+    "response": [
+      {
+        "cards": [
+          {
+            "point": 18,
+            "comment": "Cites verifiable data points (Bangladesh's 2021 LDC graduation, EBA tariff exemptions, Serum Institute's vaccine output, $50B remittances, COVAX's ~2B doses) that are largely accurate and well-sourced, strengthening the empirical foundation of the case.",
+            "cardName": "Technical Accuracy"
+          },
+          {
+            "point": 18,
+            "comment": "The natural-experiment framing (North/South Korea, East/West Germany, pre/post-1978 China, pre/post-1991 India, pre/post-Doi Moi Vietnam) is logically tight, holding confounders constant to isolate the effect of openness, and directly rebuts the 'unfalsifiable thesis' charge.",
+            "cardName": "Reasoning"
+          },
+          {
+            "point": 17,
+            "comment": "Offers concrete, real-world policy responses to opponent's concerns—Chile/Malaysia's capital controls within open economies, the 140-country tax agreement—showing globalization's problems are being practically managed rather than merely asserted away.",
+            "cardName": "Practicality"
+          },
+          {
+            "point": 19,
+            "comment": "Systematically addresses every prong of the opposition's case—Africa's causation, WTO asymmetry, subsistence romanticization, vaccine equity—and closes with a comprehensive welfare ledger (poverty, mortality, literacy, inequality trends), leaving little unaddressed.",
+            "cardName": "Completeness"
+          },
+          {
+            "point": 18,
+            "comment": "Structured as a direct point-by-point rebuttal with clear headers and transitions, culminating in an explicit weighing mechanism ('weigh the final ledger') that makes the burden and conclusion easy to follow.",
+            "cardName": "Clarity"
+          }
+        ],
+        "candidateNumber": 1
+      },
+      {
+        "cards": [
+          {
+            "point": 17,
+            "comment": "Grounds claims in specific facts (Korea/Taiwan's state-directed industrialization, the 1997 Asian and 2008 crises, Vietnam's state land ownership, $427B tax avoidance estimate) that are largely accurate, though the tax figure and its framing as 'unenforced' could use more precise sourcing.",
+            "cardName": "Technical Accuracy"
+          },
+          {
+            "point": 18,
+            "comment": "Effectively reframes the Korea comparison as managed vs. unmanaged integration rather than open vs. closed, and exposes a genuine logical inconsistency in the opponent's treatment of Bangladesh/Vietnam's state subsidies as compatible with 'free' globalization.",
+            "cardName": "Reasoning"
+          },
+          {
+            "point": 15,
+            "comment": "Argues for policy autonomy and state-directed industrialization as the real driver of success, but offers fewer concrete mechanisms (compared to opponent's Chile/Malaysia examples) for how developing nations could practically reclaim that autonomy under current WTO rules.",
+            "cardName": "Practicality"
+          },
+          {
+            "point": 18,
+            "comment": "Covers the same major terrain as the opponent—Africa, Korea, Vietnam, financial crises, vaccines, subsistence agriculture, Bangladesh, tax avoidance—constructing a coherent counter-narrative that dependency and structural constraint outweigh headline poverty metrics.",
+            "cardName": "Completeness"
+          },
+          {
+            "point": 18,
+            "comment": "Clearly organized rebuttal that isolates specific claims from the opponent's case and answers them in turn, with the recurring throughline that 'managed' integration differs fundamentally from the 'unmanaged' globalization being defended.",
+            "cardName": "Clarity"
+          }
+        ],
+        "candidateNumber": 2
+      }
+    ],
+    "agentStatus": "hasReplied"
+  },
+  {
+    "node": "judge",
+    "actor": "Judge 2 (anthropic/claude-opus-4-8)",
+    "response": [
+      {
+        "cards": [
+          {
+            "point": 18,
+            "comment": "Deployed a wealth of accurate, specific data: $50B remittances, Bangladesh's EBA access, $47B garment industry, 97% domestic pharma supply, COVAX's ~2B doses, and the 140-country tax deal. Figures are largely verifiable and correctly contextualized.",
+            "cardName": "Technical Accuracy"
+          },
+          {
+            "point": 18,
+            "comment": "Strong causal logic using natural-experiment comparisons (Korea, Germany, China, India, Vietnam) to isolate openness as the variable. Effectively turned the opponent's concessions (state policy + markets) into support for 'globalization managed well.' The 1974 famine counter to subsistence resilience was particularly sharp.",
+            "cardName": "Reasoning"
+          },
+          {
+            "point": 17,
+            "comment": "Grounded arguments in actionable realities—EBA preferences, LDC exemptions, Chilean/Malaysian capital regulation—showing integration is compatible with policy space. Slightly understated the enforcement gap on tax avoidance.",
+            "cardName": "Practicality"
+          },
+          {
+            "point": 18,
+            "comment": "Systematically addressed every opponent objection: Africa, unfalsifiability, WTO asymmetry, subsistence resilience, vaccines, and the final ledger. Few threads left dangling.",
+            "cardName": "Completeness"
+          },
+          {
+            "point": 17,
+            "comment": "Well-structured point-by-point rebuttal with a clear weighing framework at the close. Occasionally dense with statistics, but the logical throughline stayed legible.",
+            "cardName": "Clarity"
+          }
+        ],
+        "candidateNumber": 1
+      },
+      {
+        "cards": [
+          {
+            "point": 14,
+            "comment": "Accurate on the South Korea/Taiwan state-directed model and the $427B tax avoidance figure. However, the claim that WTO rules 'forbid' industrial policy is overstated—undermined by Candidate 1's evidence that China, Vietnam, and Bangladesh actively used such tools while integrated.",
+            "cardName": "Technical Accuracy"
+          },
+          {
+            "point": 14,
+            "comment": "The 'succeeded despite globalization' framing is a coherent structuralist argument, but risks being unfalsifiable: any success is credited to state policy, any failure to integration. The North Korea rebuttal (authoritarianism, not chosen model) was a fair point, but did not overcome the breadth of Candidate 1's comparative cases.",
+            "cardName": "Reasoning"
+          },
+          {
+            "point": 12,
+            "comment": "Emphasized real constraints but offered little viable alternative. The claim that subsistence agriculture's resilience outweighs integration's gains sits uneasily against the famine counter-evidence and does not present a practical development path.",
+            "cardName": "Practicality"
+          },
+          {
+            "point": 14,
+            "comment": "Engaged most of Candidate 1's points—poverty metrics, counterfactuals, financial fragility, tax avoidance—but left the halved child mortality, life-expectancy, and falling between-nation inequality claims largely unrebutted.",
+            "cardName": "Completeness"
+          },
+          {
+            "point": 15,
+            "comment": "Clear thesis on structural dependency and coherent organization. Some assertions ('intended architecture') read as rhetorical framing rather than substantiated claims, slightly diluting precision.",
+            "cardName": "Clarity"
+          }
+        ],
+        "candidateNumber": 2
+      }
+    ],
+    "agentStatus": "hasReplied"
+  }
+]

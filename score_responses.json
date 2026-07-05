@@ -1,0 +1,20 @@
+{
+  "tie": false,
+  "score": 178,
+  "winner": "Candidate 1",
+  "comment": "Candidate 1 won decisively with 178 points to Candidate 2's 155, and both judges independently scored Candidate 1 higher. Judges consistently praised Candidate 1's natural-experiment reasoning (Korea, Germany, China, India, Vietnam), its wealth of accurate data, and its systematic completeness in rebutting every objection while leaving key claims like halved child mortality and falling between-nation inequality unrebutted by Candidate 2. Candidate 2 offered a coherent structuralist counter-narrative but was flagged for risking unfalsifiability, overstating WTO constraints, and offering few practical alternatives.",
+  "candidateScores": [
+    {
+      "model": "claude-fable-5",
+      "score": 178,
+      "provider": "anthropic",
+      "candidateNumber": 1
+    },
+    {
+      "model": "claude-haiku-4-5",
+      "score": 155,
+      "provider": "anthropic",
+      "candidateNumber": 2
+    }
+  ]
+}

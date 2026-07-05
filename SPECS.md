@@ -31,8 +31,8 @@ The system is designed as a choreographed, event-driven architecture with no cen
 - - models table: {id, provider_id, name}
 - - categories table: {id (int), name}
 - - topics table: {id(int), catgory_id, topic}
-- - experiments table: {id, uuid, topic_id, candidate_config (jsonb), judge_config(json), created_at, modified_at}
-- - results table: {id, experiement_id, candidate_response(jonsb), judge_response(json), created_at}
+- - experiments table: {id, uuid, topic_id, candidate_config (jsonb), judge_config(json), status (running|completed|failed), created_at, modified_at}
+- - results table: {id, experiement_id, candidate_response(jonsb), judge_response(json), score_response(jsonb), created_at}
 
 - API endpoints:
 - - POST /api/experiments/: create a experiment entity in database (PostgreSQL), and store the entity in cache, then publish an message event
@@ -40,6 +40,7 @@ The system is designed as a choreographed, event-driven architecture with no cen
 - - GET /api/experiments/{uudi}: return one experiment entity;
 - - GET /api/models/; return a list of models entities
 - - GET /api/topics: return a list of topics entities
+- - GET /api/analytics: return aggregate stats computed from the results table (per-model win/battle counts, win rate, avg score; wins by category; winner/avg by score card; avg score by judge) for the Analytics page
 - - websocket /ws/experiments/{uuid}: backend will poll the redis item for uuid and stream to this endpoint
 
 - Interfaces
@@ -51,6 +52,7 @@ ExperimentEvent {
     candidateConfigs: CandidateConfig[];
     judgeConfigs: JudeConfig[];
     scoreCards: ScoreCardConfig[];
+    rounds: int (1-5);   // number of candidate argument rounds, user-supplied at creation
 }
 
 CandidateConfig {
@@ -78,6 +80,8 @@ ScoreCardConfig {
 ExperimentCache extend ExperimentEvent{
     messages: Response[];
     agentStatus: isThinking|hasReplied
+    retryCount: int;      // bumped by recover-service each time it replays a stalled stage
+    updatedAt: string;     // refreshed on every save; used by recover-service to detect staleness
 }
 
 Message {
@@ -118,7 +122,8 @@ CandidateScore {
 - - build the candidates from ExperimentEvent.candidateConfigs, 
 - - for each candidates, call LLM with topic and candidateConfigs to get a result: the LLM should respone as CandidateResponse
 - - then append the result to redis ExperimentCache.messages
-- - when both candidates have responded, then call publish_event tool to publish the event
+- - repeat candidate 1 -> candidate 2 for ExperimentEvent.rounds rounds (each round both candidates argue again, seeing the transcript so far) before publishing
+- - when both candidates have responded for the final round, then call publish_event tool to publish the event
 
 ExperimentEvent {
     eventName: model_arena.candidates.responded    // publish to RabbitMQ exchange model_arena.candidates
@@ -173,5 +178,15 @@ ExperimentEvent {
 
 => backend subscribes subscribe to exchange model_arena.scores for model_arena.scores.responded only and persiste the full cache item to database, also mark the experiment as completed:
 - - for experiement that has been completed: backend should not poll redis for streamming on /ws/experiements/{uuid}
+
+## Recover Service:
+- NestJS; a background sweeper (no LLM, no HTTP business API besides a health check) that recovers experiments stuck mid-pipeline (e.g. an agent crashed or a message was dropped)
+- runs on a fixed interval (default 30s): scans the experiments table in Postgres for status = running
+- - for each running experiment, load its ExperimentCache from Redis (guarded by a short-lived per-experiment Redis lock so only one sweep instance acts on it at a time)
+- - if the cache is missing entirely: mark the experiment failed
+- - if the cache was updated recently (below a staleness threshold, default 120s): skip it, it's still legitimately in progress
+- - if it has already been retried too many times (default 3): mark the experiment failed
+- - otherwise: figure out which stage (candidate/judge/score) is stuck by comparing how many messages exist vs. how many are expected, strip that stage's partial messages from the cache, bump retryCount and updatedAt, and re-publish the event for that stage's exchange/routing key (or, if every stage had already replied but the experiment was never marked completed, replay the final scores.responded event)
+- - this makes the pipeline self-healing without a central orchestrator: recovery is just another choreography participant that re-emits the appropriate event
 
 

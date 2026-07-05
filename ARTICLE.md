@@ -346,6 +346,76 @@ Waiting for a real crash to validate a recovery sweeper is slow and non-repeatab
 
 ---
 
+## Worked Example: One Debate, Start to Finish
+
+Everything above is easier to place against a real run. Here's an actual 3-round experiment — topic: *"Does globalization benefit developing nations more than it harms them?"* — with `claude-fable-5` as Candidate 1 (arguing for), `claude-haiku-4-5` as Candidate 2 (arguing against), and `claude-sonnet-5` / `claude-opus-4-8` as the two judges.
+
+Candidate-agent's round 1 output (trimmed to the header and first argument each — the full transcript runs three rounds of rebuttal):
+
+```json
+{
+  "node": "candidate",
+  "actor": "Candidate 1 (anthropic/claude-fable-5)",
+  "response": {
+    "header": "Globalization Has Been the Greatest Poverty-Reduction Engine in Human History for Developing Nations",
+    "arguments": [
+      "The empirical record on poverty is decisive: since 1990, as developing nations integrated into global markets, extreme poverty fell from roughly 36% of the world's population to under 10% — the fastest decline ever recorded. China alone lifted over 800 million people out of poverty after opening to trade in 1978..."
+    ]
+  }
+}
+```
+```json
+{
+  "node": "candidate",
+  "actor": "Candidate 2 (anthropic/claude-haiku-4-5)",
+  "response": {
+    "header": "Globalization Has Concentrated Wealth and Destabilized Developing Nations More Than It Has Lifted Them",
+    "arguments": [
+      "While absolute poverty numbers have fallen, this masks a deeper failure: the benefits of globalization have been radically unequal, with most gains captured by multinational corporations, wealthy elites in developing nations, and developed-world consumers..."
+    ]
+  }
+}
+```
+
+This is where the LLM-as-judge design in Step 5 becomes concrete. Judge-agent doesn't return a bare score — every card carries a `comment` that has to justify the number, which is what makes the judge's structured output auditable rather than a black box:
+
+```json
+{
+  "actor": "Judge 1 (anthropic/claude-sonnet-5)",
+  "response": [{
+    "candidateNumber": 1,
+    "cards": [
+      { "cardName": "Technical Accuracy", "point": 18, "comment": "Cites verifiable data points (Bangladesh's 2021 LDC graduation, EBA tariff exemptions, Serum Institute's vaccine output...) that are largely accurate and well-sourced." },
+      { "cardName": "Reasoning", "point": 18, "comment": "The natural-experiment framing (North/South Korea, East/West Germany, pre/post-1978 China...) is logically tight, holding confounders constant to isolate the effect of openness." },
+      { "cardName": "Practicality", "point": 17, "comment": "Offers concrete, real-world policy responses to opponent's concerns—Chile/Malaysia's capital controls, the 140-country tax agreement." },
+      { "cardName": "Completeness", "point": 19, "comment": "Systematically addresses every prong of the opposition's case... leaving little unaddressed." },
+      { "cardName": "Clarity", "point": 18, "comment": "Structured as a direct point-by-point rebuttal with clear headers and transitions, culminating in an explicit weighing mechanism." }
+    ]
+  }]
+}
+```
+
+Both judges scored Candidate 1 higher on every card (Judge 2's scores ran 17-18 for Candidate 1 vs. 12-15 for Candidate 2, largely on the same grounds: Candidate 2's structuralist argument was judged coherent but light on practical alternatives). Score-agent's deterministic reduction and the arbiter's verdict — from Step 5 — then produced:
+
+```json
+{
+  "tie": false,
+  "score": 178,
+  "winner": "Candidate 1",
+  "comment": "Candidate 1 won decisively with 178 points to Candidate 2's 155, and both judges independently scored Candidate 1 higher. Judges consistently praised Candidate 1's natural-experiment reasoning (Korea, Germany, China, India, Vietnam), its wealth of accurate data, and its systematic completeness in rebutting every objection while leaving key claims like halved child mortality and falling between-nation inequality unrebutted by Candidate 2. Candidate 2 offered a coherent structuralist counter-narrative but was flagged for risking unfalsifiability, overstating WTO constraints, and offering few practical alternatives.",
+  "candidateScores": [
+    { "candidateNumber": 1, "provider": "anthropic", "model": "claude-fable-5", "score": 178 },
+    { "candidateNumber": 2, "provider": "anthropic", "model": "claude-haiku-4-5", "score": 155 }
+  ]
+}
+```
+
+Note what the arbiter's `comment` is actually doing: it's not restating the score, it's citing *which specific arguments* each judge found convincing or unrebutted — the same kind of justification the judges themselves had to produce per card. This is the point of never letting a winner be decided by comparing two integers in code (Step 5) — even in a lopsided 178-to-155 result like this one, the verdict comes with reasons a human could push back on.
+
+Full transcripts backing this example: `candidate_responses.json`, `judge_responses.json`, `score_responses.json` at the repo root.
+
+---
+
 ## Key Design Decisions
 
 **Choreography over orchestration.** Every pipeline stage owns one exchange in, one exchange out, and the full event payload — no service needs to know the shape of the pipeline beyond its own two neighbors. The cost, paid deliberately, is that nothing owns end-to-end health; that's what the recovery sweeper exists to backfill.
