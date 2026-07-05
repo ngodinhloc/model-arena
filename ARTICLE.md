@@ -1,4 +1,4 @@
-# LLM-as-Judge: Designing a Multi-Agent Model Debate Platform with Auto-Recovery
+# LLM-as-Judge: Building an Auto-Recovering Multi-Agent Debate System
 
 This article walks through the design of **ModelArena**, a platform that pits two LLM candidates against each other in a structured debate, has two LLM judges score the transcript against a fixed rubric, and a deterministic score agent tally the totals and ask an arbiter LLM to declare — and justify — a winner. The whole pipeline is a **choreography**: four independent services, each triggered by one RabbitMQ event, each publishing exactly one event forward, with no service that knows about the pipeline as a whole. That design is simple and decoupled, but it has a sharp edge — nothing is watching for a stuck experiment. The second half of this article is about the service built to close that gap: a recovery sweeper, and the three real bugs found while building, testing, and extending it.
 
@@ -26,7 +26,11 @@ The focus is on two things above all — **LLM-as-judge** and **auto-recovery** 
 
 ## Architecture Overview
 
+![Architecture diagram](architecture.png)
+
 **Frontend** (Next.js 16, port 3000) — a New Experiment form (category/topic cascading selects, round count, two candidate configs, two judge configs, shared personas), a live experiment view that opens a WebSocket while the experiment runs, an Analytics dashboard (Recharts bar charts) aggregated from every completed experiment, an **Auto Run** page that batch-creates N randomized experiments in one click, and a **Test Auto Recovery** page that manufactures stalled experiments on demand to exercise the recovery sweeper.
+
+![New Experiment form](screenshot_new.png)
 
 **Backend** (NestJS 11, port 8000) — the only entry and exit point of the pipeline. `POST /api/experiments` writes a Postgres row, writes an `ExperimentCache` to Redis, and publishes the first event. A WebSocket gateway polls Redis every 500ms and pushes updates to the browser. A single RabbitMQ consumer waits for the *last* event in the chain (`model_arena.scores.responded`) to persist the final `Result` row and flip the experiment to `completed`.
 
@@ -224,6 +228,8 @@ const judgeModel = msg.actor.match(/\(([^)]+)\)\s*$/)?.[1]; // "Judge 1 (anthrop
 ```
 
 Everything else — win rate per model, wins by category, wins by score card, average points per card — is a straightforward `reduce` over the same rows. The frontend renders all of it as Recharts bar charts sharing one theme helper; no pie charts, no client-side aggregation logic duplicating the backend's.
+
+![Analytics dashboard](screenshot_analytics.png)
 
 ---
 
@@ -480,6 +486,10 @@ Candidate-agent's round 1 output (trimmed to the header and first argument each 
 }
 ```
 
+That's the raw event payload — the frontend renders the same exchange as side-by-side argument cards, streamed in as each candidate replies:
+
+![Candidate responses streaming in](screenshot_candidate_responses.png)
+
 This is where the LLM-as-judge design in Step 5 becomes concrete. Judge-agent doesn't return a bare score — every card carries a `comment` that has to justify the number, which is what makes the judge's structured output auditable rather than a black box:
 
 ```json
@@ -512,6 +522,10 @@ Both judges scored Candidate 1 higher on every card (Judge 2's scores ran 17-18 
   ]
 }
 ```
+
+The frontend renders each judge's full card-by-card breakdown next to the final verdict banner — this is a different run (a health-policy debate) than the globalization example above, but it shows the same shape: per-card scores with justifying comments, then one arbiter verdict underneath:
+
+![Judge score-sheets and final result](screenshot_score.png)
 
 Note what the arbiter's `comment` is actually doing: it's not restating the score, it's citing *which specific arguments* each judge found convincing or unrebutted — the same kind of justification the judges themselves had to produce per card. This is the point of never letting a winner be decided by comparing two integers in code (Step 5) — even in a lopsided 178-to-155 result like this one, the verdict comes with reasons a human could push back on.
 

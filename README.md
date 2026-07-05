@@ -11,6 +11,8 @@ Two things this project is specifically built to demonstrate:
 
 ## Architecture
 
+![Architecture diagram](architecture.png)
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Browser                                                            │
@@ -230,10 +232,20 @@ Config: `STALE_THRESHOLD_SECONDS`, `SWEEP_INTERVAL_SECONDS`, `MAX_RETRIES` (env 
 ## Frontend (port 3000)
 
 - **New Experiment** (`/`) — Category → Topic cascading selects, a 1–5 round picker, a static score-card legend, two `AgentConfigCard`s for candidates (provider → model → temperature) plus a shared candidate persona textarea, and the same for two judges. Submitting `POST /api/experiments` and redirects to `/experiments/:uuid`.
+
+  ![New Experiment form](screenshot_new.png)
+
 - **Experiment view** (`/experiments/:uuid`) — opens the WebSocket while `running`, renders candidate argument cards and judge score-sheets as they stream in, shows a "Thinking…" state per in-flight actor, and a winner banner once the score arrives. Renders a red "Failed" badge (no WS) for experiments recover-service gave up on.
+
+  ![Candidate responses streaming in](screenshot_candidate_responses.png)
+  ![Judge score-sheets and final result](screenshot_score.png)
+
 - **Auto Run** (`/auto-run`) — picks a run count (5/10/20/30), then fires that many `POST /api/experiments` calls with a randomized topic/category and randomized candidate/judge provider, model, and temperature per run. Each created experiment renders as a card (category, topic, candidate 1 vs. candidate 2) linking to its live view — useful for generating Analytics data or stress-testing the pipeline under concurrent load.
 - **Test Auto Recovery** (`/test-auto-recovery`) — picks a count (1–5) and a stall state (Candidate/Judge/Score), then calls `POST /api/test-recover` and renders the resulting stalled experiments as cards. Each one is picked up and finished for real by recover-service's sweep within `SWEEP_INTERVAL_SECONDS` — no separate "fake" completion path.
 - **Analytics** (`/analytics`) — win-rate table plus four Recharts bar charts: wins by category, winner by score card, average score per score card, average score by judge.
+
+  ![Analytics dashboard](screenshot_analytics.png)
+
 - **Sidebar** — collapsible left rail with "New Experiment", "Analytics", "Auto Run", "Test Auto Recovery", and an expandable history list from `GET /api/experiments`.
 
 ---
