@@ -1,192 +1,193 @@
-# ModelArena (LLM Evaluation & Debate Platform)
-## Project Overview
+# ModelArena — Specification
 
-ModelArena is a distributed, event-driven AI evaluation platform that benchmarks and compares LLM behavior using structured debates and multi-judge consensus scoring.
+A distributed, event-driven AI evaluation platform that benchmarks and compares LLM behavior using structured debates and multi-judge consensus scoring. The user defines a topic and configures two competing LLM candidates and two LLM judges; the system runs a fully automated debate pipeline, scores it, and determines a winner. The pipeline is choreographed via RabbitMQ events — there is no central orchestrator.
 
-The system allows users to:
+---
 
-Define or select a debate topic (benchmark)
-Configure two competing LLM candidates
-Configure multiple LLM judges
-Execute structured debates in a fully automated pipeline
-Compute final scores and determine a winner using multi-judge consensus
+## Data Interfaces
 
-The system is designed as a choreographed, event-driven architecture with no central orchestrator.
-
-## Architectue
-
-### Frontend:
-- React (NextJS): please use ../architect-multi-agent/frontentd as sample for project structure, coding pattern
-- Left menu: New Experiment button, Analytics button, Histories (vertical expanable)
-- New Experiment page: 
-- - Topic section: Category (dropdown list), Topic (dropdown list, based on Category)
-- - Candidate section: Candidate 1, and Candidate 2, each has: Provider (dropdown), Model (dropdown), Temperature (dropdown), and one component applied for both candidate: Persona (text)
-- - Judge section: Judge 1, and Judge 2, each has: Provider (dropdown), Model (dropdown), Temperature (dropdown), and one component applied for both Judges: Persona (text)
-- - Start Button: send request to Backend POST /api/experiments/, Backend will return a uuid for the experiement, Frontend then will open a websocket to Backend at /ws/experiments/{uuid}
-
-### Backend
-- Node.js (NestJS); please use ../architect-multi-agent/backend as sample for project structure, coding pattern
-- Database: 
-- - providers table: {id, name},
-- - models table: {id, provider_id, name}
-- - categories table: {id (int), name}
-- - topics table: {id(int), catgory_id, topic}
-- - experiments table: {id, uuid, topic_id, candidate_config (jsonb), judge_config(json), status (running|completed|failed), created_at, modified_at}
-- - results table: {id, experiement_id, candidate_response(jonsb), judge_response(json), score_response(jsonb), created_at}
-
-- API endpoints:
-- - POST /api/experiments/: create a experiment entity in database (PostgreSQL), and store the entity in cache, then publish an message event
-- - GET /api/experiments/: return the list of experiement entities, filter by category_id, topic_id
-- - GET /api/experiments/{uudi}: return one experiment entity;
-- - GET /api/models/; return a list of models entities
-- - GET /api/topics: return a list of topics entities
-- - GET /api/analytics: return aggregate stats computed from the results table (per-model win/battle counts, win rate, avg score; wins by category; winner/avg by score card; avg score by judge) for the Analytics page
-- - websocket /ws/experiments/{uuid}: backend will poll the redis item for uuid and stream to this endpoint
-
-- Interfaces
-ExperimentEvent {
-    eventName: model_arena.experiment.created    // publish to RabbitMQ exchange model_arena.experiment
-    experiementId: string;
-    category: string;
-    topic: string;
-    candidateConfigs: CandidateConfig[];
-    judgeConfigs: JudeConfig[];
-    scoreCards: ScoreCardConfig[];
-    rounds: int (1-5);   // number of candidate argument rounds, user-supplied at creation
-}
-
+```typescript
+// ── Config ────────────────────────────────────────────────────────────
 CandidateConfig {
-    candidateNumber: int (1, 2)
-    provider: string;
-    model: string;
-    persona: string;
-    temperature: float;
+    candidateNumber: 1 | 2;
+    provider:        string;
+    model:           string;
+    persona:         string;
+    temperature:     number;
 }
 
-JudeConfig {
-    judgeNumber: int (1, 2)
-    provider: string;
-    model: string;
-    persona: string;
-    temperature: float;
+JudgeConfig {
+    judgeNumber: 1 | 2;
+    provider:    string;
+    model:       string;
+    persona:     string;
+    temperature: number;
 }
 
 ScoreCardConfig {
-    cardName: string (Technical Accuracy | Reasoning | Practicality | Completeness | Clarity):
-    maxPoint: 20; // each card name has max point 20, total of 5 cards is 100 max
+    cardName: "Technical Accuracy" | "Reasoning" | "Practicality" | "Completeness" | "Clarity";
+    maxPoint: 20;   // each card maxes at 20; 5 cards sum to 100
 }
 
-// this store in Redis
-ExperimentCache extend ExperimentEvent{
-    messages: Response[];
-    agentStatus: isThinking|hasReplied
-    retryCount: int;      // bumped by recover-service each time it replays a stalled stage
-    updatedAt: string;     // refreshed on every save; used by recover-service to detect staleness
-}
-
-Message {
-    node: string;
-    actor: string;
-    response: [CandidateResponse|JudgeResponse|ScoreResponse];
-    agentStatus: isThinking|hasReplied
-}
-
-CandidateResposne {
-    header: string;
+// ── Responses ─────────────────────────────────────────────────────────
+CandidateResponse {
+    header:    string;
     arguments: string[];
 }
 
 JudgeResponse {
-    cardName: string (Technical Accuracy | Reasoning | Practicality | Completeness | Clarity);
-    point: int;
-    comment: string;
+    cardName: "Technical Accuracy" | "Reasoning" | "Practicality" | "Completeness" | "Clarity";
+    point:    number;
+    comment:  string;
 }
 
-ScoreResponse {
-   candidateScores: CandidateScore[];
-   winner: Candidate 1 | Candidate 2;
-   score: int; // total score of winner Candidate
+// one judge produces one score sheet per candidate
+JudgeScoreSheet {
+    candidateNumber: 1 | 2;
+    cards:           JudgeResponse[];
 }
 
 CandidateScore {
-    candidateNumber: int (1, 2)
-    provider: string;
-    model: string;
-    score: int;
+    candidateNumber: 1 | 2;
+    provider:        string;
+    model:           string;
+    score:           number;
 }
-    
-## Candidate Agent:
-- fastAPI, LangGraph: please use ../architect-multi-agent/architect-agent as sample for project structure, coding pattern
-- subscribe to exchange ModelArena.experiment for ModelArena.experiment.created only
-- upon receiving the message ExperimentEvent:
-- - build the candidates from ExperimentEvent.candidateConfigs, 
-- - for each candidates, call LLM with topic and candidateConfigs to get a result: the LLM should respone as CandidateResponse
-- - then append the result to redis ExperimentCache.messages
-- - repeat candidate 1 -> candidate 2 for ExperimentEvent.rounds rounds (each round both candidates argue again, seeing the transcript so far) before publishing
-- - when both candidates have responded for the final round, then call publish_event tool to publish the event
 
+ScoreResponse {
+    candidateScores: CandidateScore[];
+    winner:          "Candidate 1" | "Candidate 2";
+    score:           number;   // total score of the winning candidate
+    comment:         string;
+    tie:             boolean;
+}
+
+Message {
+    node:        "candidate" | "judge" | "score";
+    actor:       string;
+    response:    CandidateResponse | JudgeScoreSheet[] | ScoreResponse | null;
+    agentStatus: "isThinking" | "hasReplied";
+}
+
+// ── Events ────────────────────────────────────────────────────────────
+// Republished at each pipeline stage under a new eventName/exchange, carrying
+// the growing `messages` transcript forward.
 ExperimentEvent {
-    eventName: model_arena.candidates.responded    // publish to RabbitMQ exchange model_arena.candidates
-    experiementId: string;
-    category: string;
-    topic: string;
+    eventName:        string;   // model_arena.experiment.created | model_arena.candidates.responded
+                                 // | model_arena.judges.responded | model_arena.scores.responded
+    experimentId:     string;
+    category:         string;
+    topic:            string;
+    rounds:           number;   // 1-5, number of candidate argument rounds, set at creation
     candidateConfigs: CandidateConfig[];
-    judgeConfigs: JudeConfig[];
-    scoreCards: ScoreCardConfig[];
-    messages: Message[];
+    judgeConfigs:     JudgeConfig[];
+    scoreCards:       ScoreCardConfig[];
+    messages?:        Message[];
 }
 
-
-## Judge Agent:
-- fastAPI, LangGraph: please use ../architect-multi-agent/architect-agent as sample for project structure, coding pattern
-- subscribe to exchange model_arena.candidates for model_arena.candidates.responded only
-- upon receiving the message ExperimentEvent:
-- - build the judges from ExperimentEvent.judgeConfigs, 
-- - for each judge, call LLM with topic and judgeConfigs and scoreCards to get a result: the LLM should resposne as JudgeResponse
-- - append the result to redis ExperimentCache.messages
-- - when both judeges have responded, then call publish_event tool to publish the event
-
-ExperimentEvent {
-    eventName: model_arena.judges.responded    // publish to RabbitMQ exchange model_arena.judges
-    experiementId: string;
-    category: string;
-    topic: string;
-    candidateConfigs: CandidateConfig[];
-    judgeConfigs: JudeConfig[];
-    scoreCards: ScoreCardConfig[];
-    messages: Message[];
+// stored in Redis at experiment:{uuid}
+ExperimentCache extends ExperimentEvent {
+    messages:    Message[];
+    agentStatus: "isThinking" | "hasReplied";
+    retryCount:  number;   // bumped by recover-service each time it replays a stalled stage
+    updatedAt:   string;   // refreshed on every save; used by recover-service to detect staleness
 }
+```
 
-## Score Agent:
+---
 
-- fastAPI, LangGraph: please use ../architect-multi-agent/architect-agent as sample for project structure, coding pattern
-- subscribe to exchange model_arena.judges for model_arena.judges.responded only
-- upon receiving the message ExperimentEvent: go through the messages of JudgeResponse, and calculate the total score for each candidate
-- - append the result to redis ExperimentCache.messages
-- - then call publish_event tool to publish the event
+## Components
 
-ExperimentEvent {
-    eventName: model_arena.scores.responded    // publish to RabbitMQ exchange model_arena.scores
-    experiementId: string;
-    category: string;
-    topic: string;
-    candidateConfigs: CandidateConfig[];
-    judgeConfigs: JudeConfig[];
-    scoreCards: ScoreCardConfig[];
-    messages: Message[];
-}
+### frontend (port 3000)
+Next.js / React. Left menu: "New Experiment", "Analytics", and an expandable "Histories" list.
 
-=> backend subscribes subscribe to exchange model_arena.scores for model_arena.scores.responded only and persiste the full cache item to database, also mark the experiment as completed:
-- - for experiement that has been completed: backend should not poll redis for streamming on /ws/experiements/{uuid}
+- **New Experiment page** — Topic section (Category dropdown → Topic dropdown); Candidate section (Candidate 1 / Candidate 2, each with Provider, Model, Temperature dropdowns, plus a shared Persona text field); Judge section (same shape as Candidate, for Judge 1 / Judge 2). "Start" sends `POST /api/experiments`, receives a `uuid`, then opens a WebSocket to `/ws/experiments?uuid={uuid}` to stream live progress.
+- **Analytics page** — renders the aggregates from `GET /api/analytics`.
 
-## Recover Service:
-- NestJS; a background sweeper (no LLM, no HTTP business API besides a health check) that recovers experiments stuck mid-pipeline (e.g. an agent crashed or a message was dropped)
-- runs on a fixed interval (default 30s): scans the experiments table in Postgres for status = running
-- - for each running experiment, load its ExperimentCache from Redis (guarded by a short-lived per-experiment Redis lock so only one sweep instance acts on it at a time)
-- - if the cache is missing entirely: mark the experiment failed
-- - if the cache was updated recently (below a staleness threshold, default 120s): skip it, it's still legitimately in progress
-- - if it has already been retried too many times (default 3): mark the experiment failed
-- - otherwise: figure out which stage (candidate/judge/score) is stuck by comparing how many messages exist vs. how many are expected, strip that stage's partial messages from the cache, bump retryCount and updatedAt, and re-publish the event for that stage's exchange/routing key (or, if every stage had already replied but the experiment was never marked completed, replay the final scores.responded event)
-- - this makes the pipeline self-healing without a central orchestrator: recovery is just another choreography participant that re-emits the appropriate event
+### backend (port 8000)
+NestJS API. Owns experiment state in PostgreSQL and Redis, and is the choreography entry/exit point.
 
+**Database (PostgreSQL)**
 
+| Table | Columns |
+|---|---|
+| `experiments` | `id` (PK), `uuid` (unique), `category`, `topic`, `rounds`, `candidate_config` (jsonb), `judge_config` (jsonb), `status` (`running`\|`completed`\|`failed`), `created_at`, `modified_at` |
+| `results` | `id` (PK), `experiment_id` (FK → experiments.id), `candidate_response` (jsonb), `judge_response` (jsonb), `score_response` (jsonb), `created_at` |
+
+Providers, models, categories, and topics are not database-backed — they're served from static seed data by the catalog module.
+
+**REST API**
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/experiments` | Create an experiment: persist to Postgres, seed the Redis cache, publish `model_arena.experiment.created` |
+| `GET` | `/api/experiments` | List experiments, filterable by category/topic |
+| `GET` | `/api/experiments/:uuid` | Get one experiment |
+| `GET` | `/api/models` | List providers + models |
+| `GET` | `/api/categories` | List categories |
+| `GET` | `/api/topics?category_id=` | List topics for a category |
+| `GET` | `/api/analytics` | Aggregate stats from `results` (per-model win/battle counts, win rate, avg score; wins by category; winner/avg by score card; avg score by judge) |
+| `GET` | `/api/health` | Health check |
+
+**WebSocket**: `/ws/experiments?uuid={uuid}` — polls the Redis `ExperimentCache` for the given experiment and streams updates. Once an experiment is `completed`, the backend stops polling Redis for that connection.
+
+**Subscribes** to exchange `model_arena.scores`, routing key `model_arena.scores.responded`: on receipt, persists the full cache to `results` and marks the experiment `completed`.
+
+### candidate-agent (port 8001)
+FastAPI + LangGraph. Subscribes to exchange `model_arena.experiment`, routing key `model_arena.experiment.created` only.
+
+On receiving an `ExperimentEvent`:
+1. Build the two candidates from `candidateConfigs`.
+2. For each candidate, call its LLM with the topic and config to get a `CandidateResponse`, and append it to `ExperimentCache.messages` in Redis.
+3. Repeat candidate 1 → candidate 2 for `rounds` rounds — each round both candidates argue again, seeing the transcript so far.
+4. When both candidates have responded for the final round, publish the event to exchange `model_arena.candidates`, routing key `model_arena.candidates.responded`.
+
+### judge-agent (port 8002)
+FastAPI + LangGraph. Subscribes to exchange `model_arena.candidates`, routing key `model_arena.candidates.responded` only.
+
+On receiving an `ExperimentEvent`:
+1. Build the two judges from `judgeConfigs`.
+2. For each judge, call its LLM with the topic, `judgeConfigs`, and `scoreCards` to score every score card per candidate (`JudgeScoreSheet[]`), and append the result to `ExperimentCache.messages` in Redis.
+3. When both judges have responded, publish the event to exchange `model_arena.judges`, routing key `model_arena.judges.responded`.
+
+### score-agent (port 8003)
+FastAPI + LangGraph. Subscribes to exchange `model_arena.judges`, routing key `model_arena.judges.responded` only.
+
+On receiving an `ExperimentEvent`: tally each judge's `JudgeScoreSheet[]` into a `ScoreResponse` (per-candidate totals, winner, tie), append it to `ExperimentCache.messages` in Redis, then publish the event to exchange `model_arena.scores`, routing key `model_arena.scores.responded`.
+
+### recover-service (port 8004)
+NestJS background sweeper — no LLM, no user-facing API beyond a health check. Recovers experiments stuck mid-pipeline (an agent crashed, a message was dropped).
+
+- Runs on a fixed interval (`SWEEP_INTERVAL_SECONDS`, default 30s): scans `experiments` in Postgres for `status = running`.
+- For each running experiment, loads its `ExperimentCache` from Redis, guarded by a short-lived per-experiment Redis lock so only one sweep instance acts on it.
+  - Cache missing entirely → mark the experiment `failed`.
+  - Cache updated within `STALE_THRESHOLD_SECONDS` (default 120s) → skip, still legitimately in progress.
+  - `retryCount` ≥ `MAX_RETRIES` (default 3) → mark the experiment `failed`.
+  - Otherwise: determine which stage (candidate/judge/score) is stuck by comparing messages present vs. expected, strip that stage's partial messages, bump `retryCount` and `updatedAt`, and re-publish the event to that stage's exchange/routing key — or, if every stage already replied but the experiment was never marked `completed`, replay the final `model_arena.scores.responded` event.
+- This makes the pipeline self-healing without a central orchestrator: recovery is just another choreography participant that re-emits the appropriate event.
+
+### Infrastructure
+- **PostgreSQL (port 5432)** — `experiments` and `results` tables (`arena` database), shared by backend and recover-service.
+- **Redis** — live `ExperimentCache` per experiment during pipeline execution.
+- **RabbitMQ (port 5672)** — topic exchanges choreographing the pipeline: `model_arena.experiment`, `model_arena.candidates`, `model_arena.judges`, `model_arena.scores`.
+
+---
+
+## Workflow
+
+### New experiment
+
+1. User configures Topic, Candidate 1/2, and Judge 1/2 on the New Experiment page and clicks Start.
+2. Frontend `POST /api/experiments` → backend creates the experiment in PostgreSQL (`status: running`), seeds an `ExperimentCache` in Redis, publishes `model_arena.experiment.created`, and returns `{ uuid }`.
+3. Frontend opens a WebSocket to `/ws/experiments?uuid={uuid}`.
+4. **candidate-agent** runs both candidates for `rounds` rounds, appending each `CandidateResponse` to the Redis cache, then publishes `model_arena.candidates.responded`.
+5. **judge-agent** runs both judges over the full transcript and score cards, appending each `JudgeScoreSheet[]` to the Redis cache, then publishes `model_arena.judges.responded`.
+6. **score-agent** tallies the judges' scores into a `ScoreResponse`, appends it to the Redis cache, then publishes `model_arena.scores.responded`.
+7. Throughout steps 4-6, the backend's WebSocket gateway polls the Redis cache and streams updates to the frontend; the UI renders each new `Message` as it arrives.
+8. On `model_arena.scores.responded`, the backend persists the full cache to `results`, marks the experiment `completed`, and stops polling Redis for that connection.
+
+### Recovery (self-healing)
+
+1. `recover-service` sweeps `experiments` with `status = running` every `SWEEP_INTERVAL_SECONDS`.
+2. For any experiment whose Redis cache is stale (not updated within `STALE_THRESHOLD_SECONDS`) and under `MAX_RETRIES`, it identifies the stuck stage, strips that stage's partial messages, bumps `retryCount`/`updatedAt`, and re-publishes the event for that stage — letting the appropriate agent pick up where the pipeline stalled.
+3. Experiments with a missing cache, or that have exhausted `MAX_RETRIES`, are marked `failed`.

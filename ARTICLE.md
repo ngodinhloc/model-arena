@@ -1,26 +1,8 @@
 # LLM-as-Judge: Building an Auto-Recovering Multi-Agent Debate System
 
-This article walks through the design of **ModelArena**, a platform that pits two LLM candidates against each other in a structured debate, has two LLM judges score the transcript against a fixed rubric, and a deterministic score agent tally the totals and ask an arbiter LLM to declare — and justify — a winner. The whole pipeline is a **choreography**: four independent services, each triggered by one RabbitMQ event, each publishing exactly one event forward, with no service that knows about the pipeline as a whole. That design is simple and decoupled, but it has a sharp edge — nothing is watching for a stuck experiment. The second half of this article is about the service built to close that gap: a recovery sweeper, and the three real bugs found while building, testing, and extending it.
+This article walks through the design of **ModelArena**, a platform that pits two LLM candidates against each other in a structured debate, has two LLM judges score the transcript against a fixed rubric, and a deterministic score agent tally the totals and ask an arbiter LLM to declare — and justify — a winner. The whole pipeline is a **choreography**: four independent services, each triggered by one RabbitMQ event, each publishing exactly one event forward, with no service that knows about the pipeline as a whole. That design is simple and decoupled, but it has a sharp edge — nothing is watching for a stuck experiment. The second half of this article covers the recovery sweeper built to close that gap, and the three real bugs found while building, testing, and extending it.
 
-The focus is on two things above all — **LLM-as-judge** and **auto-recovery** — and the supporting decisions that make each of them work in practice:
-
-**LLM-as-judge**
-- Why judging is split into a deterministic step (summing rubric points) and a separate LLM step (declaring and justifying a winner) instead of asking one LLM call to do both
-- Why the arbiter LLM call still runs even when the point totals are tied, rather than defaulting silently to a fixed candidate
-- How judge and arbiter prompts stay structured-output-only, with a bulletproof fallback so an LLM outage can never leave a verdict unresolved
-
-**Auto-recovery**
-- How to detect a stalled stage in a system with no orchestrator watching it, and why the obvious heuristic — look at the last message — is wrong
-- Why dispatch-by-payload-field, not by-transport-routing-key, is a trap that's easy to miss until you replay a message yourself
-- How to strip and safely re-run just the stuck stage without double-counting or discarding already-finished work
-- Why a missing Redis cache isn't unrecoverable — Postgres already holds enough to restart the experiment from scratch, if the sweeper is willing to treat "zero progress" as just another starting state
-- How to manufacture a stalled experiment on demand, from real completed data, via a dedicated Test Auto Recovery page — instead of waiting for a real crash
-
-**Supporting architecture**
-- How to design a multi-stage pipeline as pure choreography — one topic exchange per stage, full event payloads, no central coordinator
-- How to structure each stage as its own small LangGraph, with a conditional loop for multi-round debates
-- How a shared Redis cache doubles as both live UI state and the only signal the recovery process has to work with
-- How to keep a message contract in sync across TypeScript and three separate Python services
+Two things matter most: **LLM-as-judge** — splitting deterministic rubric scoring from an LLM-decided, always-justified verdict — and **auto-recovery** — detecting and safely replaying a stalled stage in a pipeline with no orchestrator watching it.
 
 ---
 
