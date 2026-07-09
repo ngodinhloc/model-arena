@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
-export const EXPERIMENT_TTL_SECONDS = 7200;
+export const EXPERIMENT_TTL_SECONDS = 1800;
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {

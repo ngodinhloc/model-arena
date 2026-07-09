@@ -1,5 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import * as amqp from 'amqplib';
+import { AppLogger } from 'src/common/logger/services/app-logger';
+import { ExperimentEvent } from 'src/experiment/contracts/experiment.interface';
 
 type MessageHandler = (payload: Record<string, unknown>) => Promise<void>;
 
@@ -11,15 +13,18 @@ interface Subscription {
 }
 
 @Injectable()
-export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(RabbitMQService.name);
+export class RabbitMqClient implements OnModuleInit, OnModuleDestroy {
   private connection: amqp.ChannelModel | null = null;
   private channel: amqp.Channel | null = null;
   private pendingSubscriptions: Subscription[] = [];
+  private readonly rabbitMqUrl: string = process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672/';
+
+  constructor(
+    private readonly logger: AppLogger,
+  ) {}
 
   async onModuleInit() {
-    const url = process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672/';
-    await this.connect(url);
+    await this.connect(this.rabbitMqUrl);
     for (const sub of this.pendingSubscriptions) {
       await this.bindSubscription(sub);
     }
@@ -49,16 +54,16 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     await this.connection?.close();
   }
 
-  async publish(exchange: string, routingKey: string, payload: unknown): Promise<void> {
+  async publish(exchange: string, routingKey: string, event: ExperimentEvent): Promise<void> {
     if (!this.channel) {
       this.logger.error('RabbitMQService.publish: channel not ready', { exchange, routingKey });
       return;
     }
     await this.channel.assertExchange(exchange, 'topic', { durable: true });
-    this.channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(payload)), {
+    this.channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(event)), {
       persistent: true,
     });
-    this.logger.log('RabbitMQService.publish: Published', { exchange, routingKey });
+    this.logger.log('RabbitMQService.publish: Published', { exchange, routingKey, experimentId: event.experimentId, eventName: event.eventName});
   }
 
   // Register a consumer; if the connection is not up yet the binding is deferred to onModuleInit.

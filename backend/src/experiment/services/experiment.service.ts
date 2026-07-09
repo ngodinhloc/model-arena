@@ -1,11 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { RedisService } from '../../redis/services/redis.service';
-import { RabbitMQService } from '../../rabbitmq/services/rabbitmq.service';
+import { RabbitMqClient } from '../../rabbitmq/services/rabbitmq.client';
 import { CatalogService } from '../../catalog/services/catalog.service';
-import { Experiment } from '../../database/entities/experiment.entity';
 import { Result } from '../../database/entities/result.entity';
 import { CreateExperimentDto } from '../dto/create-experiment.dto';
 import {
@@ -14,19 +12,23 @@ import {
   EVENT_EXPERIMENT_CREATED,
   EXCHANGE_EXPERIMENT,
   ExperimentCache,
+  ExperimentEvent,
+  ExperimentItem,
   ExperimentStatus,
   JudgeConfig,
-  SCORE_CARD_MAX_POINT,
-  SCORE_CARD_NAMES,
 } from '../contracts/experiment.interface';
+import { ExperimentRepository } from 'src/database/repositories/experiment.repository';
+import { Experiment } from 'src/database/entities/experiment.entity';
+import { ExperimentCacheBuilder } from '../builders/experiment-cache.builder';
+import { ExperimentEventBuilder } from '../builders/expriment-event.builder';
 
 @Injectable()
 export class ExperimentService {
   constructor(
-    @InjectRepository(Experiment) private readonly experimentRepo: Repository<Experiment>,
+    private readonly experimentRepo: ExperimentRepository,
     @InjectRepository(Result) private readonly resultRepo: Repository<Result>,
     private readonly redisService: RedisService,
-    private readonly rabbitMQService: RabbitMQService,
+    private readonly rabbitMQService: RabbitMqClient,
     private readonly catalogService: CatalogService,
   ) {}
 
@@ -35,10 +37,9 @@ export class ExperimentService {
   }
 
   async createExperiment(dto: CreateExperimentDto): Promise<{ uuid: string }> {
-    const topic = await this.catalogService.getTopic(dto.topicId);
+    const topic = this.catalogService.getTopic(dto.topicId);
     if (!topic) throw new NotFoundException(`Topic ${dto.topicId} not found`);
 
-    const uuid = uuidv4();
     const candidateConfigs: CandidateConfig[] = dto.candidates.map((c) => ({
       candidateNumber: c.number,
       provider: c.provider,
@@ -54,41 +55,25 @@ export class ExperimentService {
       temperature: j.temperature,
     }));
 
-    const experiment = this.experimentRepo.create({
-      uuid,
-      category: topic.categoryName,
-      topic: topic.topic,
-      rounds: dto.rounds,
-      candidateConfig: candidateConfigs,
-      judgeConfig: judgeConfigs,
-      status: ExperimentStatus.running,
-    });
-    await this.experimentRepo.save(experiment);
-
-    const cache: ExperimentCache = {
-      eventName: EVENT_EXPERIMENT_CREATED,
-      experimentId: uuid,
-      category: topic.categoryName,
-      topic: topic.topic,
-      rounds: dto.rounds,
+    const experiment: Experiment = await this.experimentRepo.new(
+      topic.categoryName,
+      topic.topic,
+      dto.rounds,
       candidateConfigs,
       judgeConfigs,
-      scoreCards: SCORE_CARD_NAMES.map((cardName) => ({ cardName, maxPoint: SCORE_CARD_MAX_POINT })),
-      messages: [],
-      agentStatus: AgentStatus.isThinking,
-      updatedAt: new Date().toISOString(),
-      retryCount: 0,
-    };
-    await this.redisService.setJson(this.redisKey(uuid), cache);
+    );
 
-    const { messages: _messages, agentStatus: _agentStatus, ...event } = cache;
+    const cache: ExperimentCache = ExperimentCacheBuilder.build(experiment, [], AgentStatus.isThinking);
+    await this.redisService.setJson(this.redisKey(experiment.uuid), cache);
+
+    const event: ExperimentEvent = ExperimentEventBuilder.build(experiment, [], AgentStatus.isThinking);
     await this.rabbitMQService.publish(EXCHANGE_EXPERIMENT, EVENT_EXPERIMENT_CREATED, event);
 
-    return { uuid };
+    return { uuid: experiment.uuid };
   }
 
-  async listExperiments() {
-    const experiments = await this.experimentRepo.find({ order: { createdAt: 'DESC' } });
+  async listExperiments(): Promise<ExperimentItem[]> {
+    const experiments = await this.experimentRepo.findAll();
     return experiments.map((e) => ({
       uuid: e.uuid,
       topic: e.topic,
@@ -101,10 +86,10 @@ export class ExperimentService {
   }
 
   async getExperiment(uuid: string) {
-    const experiment = await this.experimentRepo.findOne({ where: { uuid } });
+    const experiment = await this.experimentRepo.findOneByUuid(uuid);
     if (!experiment) throw new NotFoundException(`Experiment ${uuid} not found`);
 
-    const base = {
+    const base: ExperimentItem = {
       uuid: experiment.uuid,
       topic: experiment.topic,
       category: experiment.category,
@@ -133,5 +118,4 @@ export class ExperimentService {
       agentStatus: AgentStatus.hasReplied,
     };
   }
-
 }

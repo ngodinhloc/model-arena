@@ -29,6 +29,10 @@ class ModelFactory:
         if provider == "anthropic" and model.startswith(self.ADAPTIVE_THINKING_PREFIXES):
             kwargs["thinking"] = {"type": "adaptive"}
             kwargs["effort"] = "low"
+            # Thinking and the final answer share max_tokens; low-effort thinking can
+            # still consume enough of a 4096 budget to leave nothing for the structured
+            # response (observed as empty-output JSON parse failures on Fable 5).
+            kwargs["max_tokens"] = 8192
         return init_chat_model(model, model_provider=provider, **kwargs)
 
     def supports_temperature(self, provider: str, model: str) -> bool:

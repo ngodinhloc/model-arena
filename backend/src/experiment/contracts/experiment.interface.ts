@@ -2,7 +2,7 @@ export const EXCHANGE_EXPERIMENT = 'model_arena.experiment';
 export const EXCHANGE_SCORES = 'model_arena.scores';
 export const EVENT_EXPERIMENT_CREATED = 'model_arena.experiment.created';
 export const EVENT_SCORES_RESPONDED = 'model_arena.scores.responded';
-export const SCORES_QUEUE = 'backend.scores';
+export const BACKEND_QUEUE = 'backend.queue';
 
 export const SCORE_CARD_NAMES = [
   'Technical Accuracy',
@@ -105,4 +105,14 @@ export interface ExperimentCache extends ExperimentEvent {
   agentStatus: AgentStatus;
   updatedAt: string;
   retryCount: number;
+}
+
+export interface ExperimentItem {
+  uuid: string;
+  topic: string;
+  category: string;
+  candidateConfig: CandidateConfig[];
+  judgeConfig: JudgeConfig[];
+  status: ExperimentStatus;
+  createdAt: Date;
 }

@@ -55,7 +55,9 @@ class Container:
 
     @cached_property
     def experiment_event_handler(self) -> ExperimentEventHandler:
-        return ExperimentEventHandler(self.agent_graph, self.logger("experiment_event_handler"))
+        return ExperimentEventHandler(
+            self.agent_graph, self.experiment_manager, self.logger("experiment_event_handler"),
+        )
 
     @cached_property
     def event_handler_map(self) -> dict:

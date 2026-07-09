@@ -1,4 +1,4 @@
-# ModelArena
+# Model Arena
 
 A **choreographed, event-driven** platform for benchmarking LLMs against each other. Configure two candidate models to debate a topic, two judge models to score the debate on five rubric cards, and a deterministic score agent tallies the totals and asks an arbiter LLM to declare — and justify — a winner. There is no central orchestrator: each stage is an independent service that consumes one RabbitMQ event, does its work, appends to a shared Redis cache (streamed live to the browser over WebSocket), and publishes the next event.
 

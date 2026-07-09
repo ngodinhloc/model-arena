@@ -1,12 +1,15 @@
 from __future__ import annotations
 import logging
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from app.agent.candidate_state import CandidateState
+from app.agent.errors import ModelRefusalError
 from app.agent.model_factory import ModelFactory
 from app.agent.candidate_templates import CANDIDATE_SYSTEM, CANDIDATE_PROMPT, STANCES
 from app.contracts.experiment_interface import CandidateResponse, Message, NodeName
 from app.services.experiment_manager import ExperimentManager
+
+MAX_LLM_ATTEMPTS = 3
 
 
 class CandidateNode:
@@ -34,16 +37,14 @@ class CandidateNode:
         cache = await self._manager.load(event.experimentId)
         transcript = self._format_transcript(cache.messages if cache else [])
 
-        llm = (
-            self._model_factory.build(config.provider, config.model, config.temperature)
-            .with_structured_output(CandidateResponse, method="json_schema")
-            .with_retry(stop_after_attempt=3)
+        llm = self._model_factory.build(config.provider, config.model, config.temperature).with_structured_output(
+            CandidateResponse, method="json_schema", include_raw=True,
         )
         self._logger.info(
             "CandidateNode: calling LLM",
             extra={"experimentId": event.experimentId, "actor": actor, "stance": stance, "round": round_number},
         )
-        response: CandidateResponse = await llm.ainvoke([
+        messages: list[BaseMessage] = [
             SystemMessage(content=CANDIDATE_SYSTEM.format(
                 candidate_number=self._number, persona=config.persona, stance=stance,
             )),
@@ -55,10 +56,32 @@ class CandidateNode:
                 total_rounds=event.rounds,
                 transcript=transcript,
             )),
-        ])
+        ]
+        response = await self._invoke_with_refusal_guard(llm, messages, actor)
 
         await self._manager.set_reply(event.experimentId, actor, response)
         return {}
+
+    async def _invoke_with_refusal_guard(
+        self, llm, messages: list[BaseMessage], actor: str,
+    ) -> CandidateResponse:
+        # include_raw=True instead of .with_retry(): a provider refusal (stop_reason ==
+        # "refusal") is deterministic for a given prompt, so retrying it would just waste
+        # attempts on a call that can never succeed. Only genuine parse failures get retried.
+        last_error: Exception | None = None
+        for attempt in range(1, MAX_LLM_ATTEMPTS + 1):
+            result = await llm.ainvoke(messages)
+            raw = result["raw"]
+            if raw.response_metadata.get("stop_reason") == "refusal":
+                raise ModelRefusalError(actor)
+            if result["parsing_error"] is None:
+                return result["parsed"]
+            last_error = result["parsing_error"]
+            self._logger.warning(
+                "CandidateNode: structured output parse failed, retrying",
+                extra={"actor": actor, "attempt": attempt, "error": str(last_error)},
+            )
+        raise last_error
 
     @staticmethod
     def _label(actor: str) -> str:

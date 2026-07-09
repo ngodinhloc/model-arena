@@ -1,8 +1,10 @@
 # LLM-as-Judge: Building an Auto-Recovering Multi-Agent Debate System
 
-This article walks through the design of **ModelArena**, a platform that pits two LLM candidates against each other in a structured debate, has two LLM judges score the transcript against a fixed rubric, and a deterministic score agent tally the totals and ask an arbiter LLM to declare — and justify — a winner. The whole pipeline is a **choreography**: four independent services, each triggered by one RabbitMQ event, each publishing exactly one event forward, with no service that knows about the pipeline as a whole. That design is simple and decoupled, but it has a sharp edge — nothing is watching for a stuck experiment. The second half of this article covers the recovery sweeper built to close that gap, and the three real bugs found while building, testing, and extending it.
+This article walks through the design of **ModelArena**, a platform that pits two LLM candidates against each other in a structured debate, has two LLM judges score the transcript against a fixed rubric, and a deterministic score agent tally the totals and ask an arbiter LLM to declare — and justify — a winner. 
 
-Two things matter most: **LLM-as-judge** — splitting deterministic rubric scoring from an LLM-decided, always-justified verdict — and **auto-recovery** — detecting and safely replaying a stalled stage in a pipeline with no orchestrator watching it.
+The architecture is a **choreography**: four independent services, each triggered by one RabbitMQ event, each publishing exactly one event forward, and a re
+
+The focus of this project: **LLM-as-judge** (the well-known pattern of having an LLM evaluate and justify a subjective outcome) and **auto-recovery** (a sweep-and-recover service that detects and replays stalled pipeline stages).
 
 ---
 

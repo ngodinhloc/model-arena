@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Experiment } from './entities/experiment.entity';
 import { Result } from './entities/result.entity';
+import { ExperimentRepository } from './repositories/experiment.repository';
 
 @Module({
   imports: [
@@ -14,7 +15,9 @@ import { Result } from './entities/result.entity';
         logging: false,
       }),
     }),
+    TypeOrmModule.forFeature([Experiment, Result]),
   ],
-  exports: [TypeOrmModule],
+  providers: [ExperimentRepository],
+  exports: [TypeOrmModule, ExperimentRepository],
 })
 export class DatabaseModule {}
