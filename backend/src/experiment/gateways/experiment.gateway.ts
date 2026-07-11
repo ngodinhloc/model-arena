@@ -91,9 +91,16 @@ export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconne
         }
 
         if (cache.agentStatus === AgentStatus.hasReplied) {
-          this.clearSubscription(client);
-          client.send(JSON.stringify({ event: 'completed', data: { uuid } }));
-          client.close(1000, 'Experiment completed');
+          // Redis flips to `hasReplied` as soon as the score-agent produces its message, but
+          // Postgres `status` only becomes `completed` once ScoreRespondedHandler drains the
+          // RabbitMQ event. Wait for Postgres too, otherwise clients (e.g. the sidebar history
+          // list) that refetch on this event can still observe `status: running`.
+          const experiment = await this.experimentRepo.findOne({ where: { uuid } });
+          if (experiment?.status === ExperimentStatus.completed) {
+            this.clearSubscription(client);
+            client.send(JSON.stringify({ event: 'completed', data: { uuid } }));
+            client.close(1000, 'Experiment completed');
+          }
         }
       } catch {
         // Redis transient error — keep polling

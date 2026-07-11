@@ -41,6 +41,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ uuid: str
   const [scoreResponse, setScoreResponse] = useState<ScoreResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +87,10 @@ export default function ExperimentPage({ params }: { params: Promise<{ uuid: str
       wsRef.current = null;
     };
   }, [uuid]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, scoreResponse]);
 
   const scoreMessage = messages.find((m) => m.node === "score" && m.agentStatus === "hasReplied");
   const finalScore = scoreResponse ?? ((scoreMessage?.response ?? null) as ScoreResponse | null);
@@ -153,6 +158,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ uuid: str
           <MessageCard key={`${message.actor}-${i}`} message={message} />
         ))}
         {finalScore && <ScoreCard response={finalScore} />}
+        <div ref={bottomRef} />
       </div>
     </main>
   );

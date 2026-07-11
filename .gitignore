@@ -8,3 +8,4 @@ __pycache__/
 tsconfig.tsbuildinfo
 next-env.d.ts
 .DS_Store
+demo_video.mov
