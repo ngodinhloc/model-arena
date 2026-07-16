@@ -12,8 +12,18 @@ import { LoggerModule } from 'src/common/logger/logger.module';
 import { DatabaseModule } from '../database/database.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Experiment, Result]), DatabaseModule, CatalogModule, LoggerModule],
+  imports: [
+    TypeOrmModule.forFeature([Experiment, Result]),
+    DatabaseModule,
+    CatalogModule,
+    LoggerModule,
+  ],
   controllers: [ExperimentController],
-  providers: [ExperimentService, AnalyticsService, RecoverService, ExperimentGateway],
+  providers: [
+    ExperimentService,
+    AnalyticsService,
+    RecoverService,
+    ExperimentGateway,
+  ],
 })
 export class ExperimentModule {}

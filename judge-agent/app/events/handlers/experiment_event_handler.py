@@ -1,5 +1,7 @@
 import logging
+
 from langgraph.graph.state import CompiledStateGraph
+
 from app.contracts.experiment_interface import ExperimentEvent
 
 
@@ -11,6 +13,10 @@ class ExperimentEventHandler:
     async def handle(self, event: ExperimentEvent) -> None:
         self._logger.info(
             "ExperimentEventHandler.handle: Received event",
-            extra={"experimentId": event.experimentId, "eventName": event.eventName, "topic": event.topic},
+            extra={
+                "experimentId": event.experimentId,
+                "eventName": event.eventName,
+                "topic": event.topic,
+            },
         )
         await self._agent_graph.ainvoke({"event": event})

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from pydantic import BaseModel
 
 from app.contracts.experiment_interface import JudgeScoreSheet

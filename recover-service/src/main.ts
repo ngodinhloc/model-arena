@@ -1,10 +1,13 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { AppLogger } from './common/logger/app-logger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: new AppLogger() });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: new AppLogger(),
+  });
   app.getHttpAdapter().getInstance().disable('etag');
 
   const port = parseInt(process.env.PORT ?? '8000', 10);
@@ -12,4 +15,4 @@ async function bootstrap() {
   console.log(`Recover-service listening on port ${port}`);
 }
 
-bootstrap();
+void bootstrap();

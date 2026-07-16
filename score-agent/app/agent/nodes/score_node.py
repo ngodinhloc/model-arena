@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 import logging
+
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agent.model_factory import ModelFactory
 from app.agent.score_interfaces import WinnerDecision
 from app.agent.score_state import ScoreState
-from app.agent.score_templates import ARBITER_SYSTEM, ARBITER_PROMPT
+from app.agent.score_templates import ARBITER_PROMPT, ARBITER_SYSTEM
 from app.configs.settings import settings
 from app.contracts.experiment_interface import (
     CandidateScore,
@@ -22,7 +24,9 @@ class ScoreNode:
     """Sums judge score sheets deterministically, then asks an arbiter LLM to
     declare the winner (mandatory even on tied totals) with a justification."""
 
-    def __init__(self, manager: ExperimentManager, logger: logging.Logger, model_factory: ModelFactory):
+    def __init__(
+        self, manager: ExperimentManager, logger: logging.Logger, model_factory: ModelFactory
+    ):
         self._manager = manager
         self._logger = logger
         self._model_factory = model_factory
@@ -106,7 +110,9 @@ class ScoreNode:
 
         try:
             llm = (
-                self._model_factory.build(settings.score_provider, settings.score_model, temperature=0)
+                self._model_factory.build(
+                    settings.score_provider, settings.score_model, temperature=0
+                )
                 .with_structured_output(WinnerDecision, method="json_schema")
                 .with_retry(stop_after_attempt=3)
             )
@@ -118,10 +124,12 @@ class ScoreNode:
                     "tie": tie,
                 },
             )
-            return await llm.ainvoke([
-                SystemMessage(content=ARBITER_SYSTEM),
-                HumanMessage(content=prompt),
-            ])
+            return await llm.ainvoke(
+                [
+                    SystemMessage(content=ARBITER_SYSTEM),
+                    HumanMessage(content=prompt),
+                ]
+            )
         except Exception as e:
             # Fall back to the point totals so the pipeline still completes.
             self._logger.exception(

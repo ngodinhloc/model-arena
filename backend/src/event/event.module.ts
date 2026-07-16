@@ -20,6 +20,11 @@ import { RabbitMqConsumer } from './services/rabbitmq.consumer';
       inject: [ScoreRespondedHandler],
     },
   ],
-  exports: [EVENT_REGISTRY, ScoreRespondedHandler, MessageProcessor, RabbitMqConsumer],
+  exports: [
+    EVENT_REGISTRY,
+    ScoreRespondedHandler,
+    MessageProcessor,
+    RabbitMqConsumer,
+  ],
 })
 export class EventModule {}

@@ -1,4 +1,11 @@
-import { Controller, Post, Get, Body, Param, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { ExperimentService } from '../services/experiment.service';
 import { AnalyticsService } from '../services/analytics.service';
 import { RecoverService } from '../services/recover.service';
@@ -14,7 +21,9 @@ export class ExperimentController {
   ) {}
 
   @Post('experiments')
-  createExperiment(@Body() dto: CreateExperimentDto): Promise<{ uuid: string }> {
+  createExperiment(
+    @Body() dto: CreateExperimentDto,
+  ): Promise<{ uuid: string }> {
     return this.experimentService.createExperiment(dto);
   }
 

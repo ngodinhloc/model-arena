@@ -7,6 +7,13 @@ import { RecoveryModule } from './recovery/recovery.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), DatabaseModule, RedisModule, RabbitMQModule, RecoveryModule, HealthModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    DatabaseModule,
+    RedisModule,
+    RabbitMQModule,
+    RecoveryModule,
+    HealthModule,
+  ],
 })
 export class AppModule {}

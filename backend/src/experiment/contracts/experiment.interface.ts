@@ -78,11 +78,12 @@ export interface ScoreResponse {
   tie: boolean;
 }
 
-export type MessageResponse = CandidateResponse | JudgeScoreSheet[] | ScoreResponse;
+export type MessageResponse =
+  CandidateResponse | JudgeScoreSheet[] | ScoreResponse;
 
 export interface Message {
   node: 'candidate' | 'judge' | 'score';
-  actor: string;  
+  actor: string;
   response: MessageResponse | null;
   agentStatus: AgentStatus;
 }

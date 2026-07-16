@@ -16,8 +16,13 @@ export class AppLogger implements LoggerService {
     this.isProd = process.env.APP_ENV === 'PROD';
     this.serviceName = process.env.SERVICE_NAME ?? 'backend';
   }
-  
-  private write(level: string, message: string, context?: object, stack?: object): void {
+
+  private write(
+    level: string,
+    message: string,
+    context?: object,
+    stack?: object,
+  ): void {
     const data: Record<string, unknown> = {};
     if (context && typeof context === 'object') Object.assign(data, context);
     if (stack) data.stack = stack;
@@ -51,17 +56,25 @@ export class AppLogger implements LoggerService {
     this.write('verbose', message, context);
   }
 
-  private formatProdLog(level: string, message: string, data: Record<string, unknown>): Record<string, unknown> {
-     return {
-        '@timestamp': new Date().toISOString(),
-        'log.level': level.toUpperCase(),
-        message,
-        'service.name': this.serviceName,
-        ...data,
-      };
+  private formatProdLog(
+    level: string,
+    message: string,
+    data: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return {
+      '@timestamp': new Date().toISOString(),
+      'log.level': level.toUpperCase(),
+      message,
+      'service.name': this.serviceName,
+      ...data,
+    };
   }
 
-  private formatDevLog(level: string, message: string, data: Record<string, unknown>): string {
+  private formatDevLog(
+    level: string,
+    message: string,
+    data: Record<string, unknown>,
+  ): string {
     const label = LEVEL_LABELS[level] ?? level;
     const ctx = Object.keys(data).length > 0 ? ` ${JSON.stringify(data)}` : '';
     return `[${label}] ${message}${ctx}`;

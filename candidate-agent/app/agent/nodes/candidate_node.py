@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 import logging
+
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from app.agent.candidate_state import CandidateState
+from app.agent.candidate_templates import CANDIDATE_PROMPT, CANDIDATE_SYSTEM, STANCES
 from app.agent.errors import ModelRefusalError
 from app.agent.model_factory import ModelFactory
-from app.agent.candidate_templates import CANDIDATE_SYSTEM, CANDIDATE_PROMPT, STANCES
 from app.contracts.experiment_interface import CandidateResponse, Message, NodeName
 from app.services.experiment_manager import ExperimentManager
 
@@ -37,25 +39,40 @@ class CandidateNode:
         cache = await self._manager.load(event.experimentId)
         transcript = self._format_transcript(cache.messages if cache else [])
 
-        llm = self._model_factory.build(config.provider, config.model, config.temperature).with_structured_output(
-            CandidateResponse, method="json_schema", include_raw=True,
+        llm = self._model_factory.build(
+            config.provider, config.model, config.temperature
+        ).with_structured_output(
+            CandidateResponse,
+            method="json_schema",
+            include_raw=True,
         )
         self._logger.info(
             "CandidateNode: calling LLM",
-            extra={"experimentId": event.experimentId, "actor": actor, "stance": stance, "round": round_number},
+            extra={
+                "experimentId": event.experimentId,
+                "actor": actor,
+                "stance": stance,
+                "round": round_number,
+            },
         )
         messages: list[BaseMessage] = [
-            SystemMessage(content=CANDIDATE_SYSTEM.format(
-                candidate_number=self._number, persona=config.persona, stance=stance,
-            )),
-            HumanMessage(content=CANDIDATE_PROMPT.format(
-                category=event.category,
-                topic=event.topic,
-                stance=stance,
-                round_number=round_number,
-                total_rounds=event.rounds,
-                transcript=transcript,
-            )),
+            SystemMessage(
+                content=CANDIDATE_SYSTEM.format(
+                    candidate_number=self._number,
+                    persona=config.persona,
+                    stance=stance,
+                )
+            ),
+            HumanMessage(
+                content=CANDIDATE_PROMPT.format(
+                    category=event.category,
+                    topic=event.topic,
+                    stance=stance,
+                    round_number=round_number,
+                    total_rounds=event.rounds,
+                    transcript=transcript,
+                )
+            ),
         ]
         response = await self._invoke_with_refusal_guard(llm, messages, actor)
 
@@ -63,7 +80,10 @@ class CandidateNode:
         return {}
 
     async def _invoke_with_refusal_guard(
-        self, llm, messages: list[BaseMessage], actor: str,
+        self,
+        llm,
+        messages: list[BaseMessage],
+        actor: str,
     ) -> CandidateResponse:
         # include_raw=True instead of .with_retry(): a provider refusal (stop_reason ==
         # "refusal") is deterministic for a given prompt, so retrying it would just waste
@@ -91,7 +111,9 @@ class CandidateNode:
     def _format_transcript(cls, messages: list[Message]) -> str:
         turns = []
         for message in messages:
-            if message.node != NodeName.candidate or not isinstance(message.response, CandidateResponse):
+            if message.node != NodeName.candidate or not isinstance(
+                message.response, CandidateResponse
+            ):
                 continue
             arguments = "\n".join(f"- {a}" for a in message.response.arguments)
             turns.append(f"{cls._label(message.actor)}: {message.response.header}\n{arguments}")

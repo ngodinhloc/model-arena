@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import { AppLogger } from 'src/common/logger/services/app-logger';
 import { ExperimentEvent } from 'src/experiment/contracts/experiment.interface';
@@ -17,11 +17,10 @@ export class RabbitMqClient implements OnModuleInit, OnModuleDestroy {
   private connection: amqp.ChannelModel | null = null;
   private channel: amqp.Channel | null = null;
   private pendingSubscriptions: Subscription[] = [];
-  private readonly rabbitMqUrl: string = process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672/';
+  private readonly rabbitMqUrl: string =
+    process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672/';
 
-  constructor(
-    private readonly logger: AppLogger,
-  ) {}
+  constructor(private readonly logger: AppLogger) {}
 
   async onModuleInit() {
     await this.connect(this.rabbitMqUrl);
@@ -40,10 +39,13 @@ export class RabbitMqClient implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       if (attempt >= maxAttempts) throw err;
       const delay = Math.min(1000 * attempt, 10000);
-      this.logger.warn(`RabbitMQService.connect: RabbitMQ not ready, retrying in ${delay}ms…`, {
-        attempt,
-        maxAttempts,
-      });
+      this.logger.warn(
+        `RabbitMQService.connect: RabbitMQ not ready, retrying in ${delay}ms…`,
+        {
+          attempt,
+          maxAttempts,
+        },
+      );
       await new Promise((r) => setTimeout(r, delay));
       return this.connect(url, attempt + 1);
     }
@@ -54,20 +56,42 @@ export class RabbitMqClient implements OnModuleInit, OnModuleDestroy {
     await this.connection?.close();
   }
 
-  async publish(exchange: string, routingKey: string, event: ExperimentEvent): Promise<void> {
+  async publish(
+    exchange: string,
+    routingKey: string,
+    event: ExperimentEvent,
+  ): Promise<void> {
     if (!this.channel) {
-      this.logger.error('RabbitMQService.publish: channel not ready', { exchange, routingKey });
+      this.logger.error('RabbitMQService.publish: channel not ready', {
+        exchange,
+        routingKey,
+      });
       return;
     }
     await this.channel.assertExchange(exchange, 'topic', { durable: true });
-    this.channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(event)), {
-      persistent: true,
+    this.channel.publish(
+      exchange,
+      routingKey,
+      Buffer.from(JSON.stringify(event)),
+      {
+        persistent: true,
+      },
+    );
+    this.logger.log('RabbitMQService.publish: Published', {
+      exchange,
+      routingKey,
+      experimentId: event.experimentId,
+      eventName: event.eventName,
     });
-    this.logger.log('RabbitMQService.publish: Published', { exchange, routingKey, experimentId: event.experimentId, eventName: event.eventName});
   }
 
   // Register a consumer; if the connection is not up yet the binding is deferred to onModuleInit.
-  async subscribe(exchange: string, queue: string, routingKey: string, handler: MessageHandler): Promise<void> {
+  async subscribe(
+    exchange: string,
+    queue: string,
+    routingKey: string,
+    handler: MessageHandler,
+  ): Promise<void> {
     const sub: Subscription = { exchange, queue, routingKey, handler };
     if (!this.channel) {
       this.pendingSubscriptions.push(sub);
@@ -76,7 +100,12 @@ export class RabbitMqClient implements OnModuleInit, OnModuleDestroy {
     await this.bindSubscription(sub);
   }
 
-  private async bindSubscription({ exchange, queue, routingKey, handler }: Subscription): Promise<void> {
+  private async bindSubscription({
+    exchange,
+    queue,
+    routingKey,
+    handler,
+  }: Subscription): Promise<void> {
     if (!this.channel) return;
     await this.channel.assertExchange(exchange, 'topic', { durable: true });
     await this.channel.assertQueue(queue, { durable: true });
@@ -85,7 +114,10 @@ export class RabbitMqClient implements OnModuleInit, OnModuleDestroy {
       if (!msg) return;
       void (async () => {
         try {
-          const payload = JSON.parse(msg.content.toString()) as Record<string, unknown>;
+          const payload = JSON.parse(msg.content.toString()) as Record<
+            string,
+            unknown
+          >;
           await handler(payload);
           this.channel?.ack(msg);
         } catch (err) {
@@ -98,6 +130,10 @@ export class RabbitMqClient implements OnModuleInit, OnModuleDestroy {
         }
       })();
     });
-    this.logger.log('RabbitMQService.subscribe: Consuming', { exchange, queue, routingKey });
+    this.logger.log('RabbitMQService.subscribe: Consuming', {
+      exchange,
+      queue,
+      routingKey,
+    });
   }
 }

@@ -35,15 +35,22 @@ export class CatalogService {
   }
 
   getTopics(categoryId?: number): TopicView[] {
-    return CATEGORIES.filter((c) => !categoryId || c.id === categoryId).flatMap((c) =>
-      c.topics.map((t) => ({ id: t.id, categoryId: c.id, topic: t.topic })),
+    return CATEGORIES.filter((c) => !categoryId || c.id === categoryId).flatMap(
+      (c) =>
+        c.topics.map((t) => ({ id: t.id, categoryId: c.id, topic: t.topic })),
     );
   }
 
   getTopic(id: number): ResolvedTopic | null {
     for (const category of CATEGORIES) {
       const topic = category.topics.find((t) => t.id === id);
-      if (topic) return { id: topic.id, topic: topic.topic, categoryId: category.id, categoryName: category.name };
+      if (topic)
+        return {
+          id: topic.id,
+          topic: topic.topic,
+          categoryId: category.id,
+          categoryName: category.name,
+        };
     }
     return null;
   }

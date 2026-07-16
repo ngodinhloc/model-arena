@@ -16,7 +16,10 @@ export class CatalogController {
   }
 
   @Get('topics')
-  getTopics(@Query('category_id', new ParseIntPipe({ optional: true })) categoryId?: number) {
+  getTopics(
+    @Query('category_id', new ParseIntPipe({ optional: true }))
+    categoryId?: number,
+  ) {
     return this.catalogService.getTopics(categoryId);
   }
 }

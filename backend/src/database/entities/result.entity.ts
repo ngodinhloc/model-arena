@@ -8,7 +8,10 @@ import {
   Index,
 } from 'typeorm';
 import { Experiment } from './experiment.entity';
-import { Message, ScoreResponse } from '../../experiment/contracts/experiment.interface';
+import {
+  Message,
+  ScoreResponse,
+} from '../../experiment/contracts/experiment.interface';
 
 @Entity('results')
 export class Result {

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging
 
 from app.agent.judge_state import JudgeState
@@ -8,7 +9,9 @@ from app.services.experiment_manager import ExperimentManager
 
 
 class PublishNode:
-    def __init__(self, manager: ExperimentManager, publisher: RabbitMQPublisher, logger: logging.Logger):
+    def __init__(
+        self, manager: ExperimentManager, publisher: RabbitMQPublisher, logger: logging.Logger
+    ):
         self._manager = manager
         self._publisher = publisher
         self._logger = logger
@@ -18,10 +21,12 @@ class PublishNode:
         cache = await self._manager.load(event.experimentId)
         messages = cache.messages if cache else event.messages
 
-        payload = event.model_copy(update={
-            "eventName": PUBLISH_EVENT_NAME,
-            "messages": messages,
-        })
+        payload = event.model_copy(
+            update={
+                "eventName": PUBLISH_EVENT_NAME,
+                "messages": messages,
+            }
+        )
         await self._publisher.publish(PUBLISH_EVENT_NAME, payload.model_dump(mode="json"))
         self._logger.info(
             "PublishNode: judges responded",

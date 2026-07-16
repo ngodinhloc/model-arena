@@ -3,26 +3,51 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timezone
 from contextlib import asynccontextmanager, suppress
+from datetime import datetime, timezone
+
+from aiormq.exceptions import ConnectionClosed
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from aiormq.exceptions import ConnectionClosed
+
 from app.configs.settings import settings
 from app.container import container
 from app.routers import health_router
 
-
 _STANDARD_LOG_ATTRS = {
-    "args", "created", "exc_info", "exc_text", "filename", "funcName",
-    "levelname", "levelno", "lineno", "message", "module", "msecs",
-    "msg", "name", "pathname", "process", "processName", "relativeCreated",
-    "stack_info", "thread", "threadName", "taskName",
+    "args",
+    "created",
+    "exc_info",
+    "exc_text",
+    "filename",
+    "funcName",
+    "levelname",
+    "levelno",
+    "lineno",
+    "message",
+    "module",
+    "msecs",
+    "msg",
+    "name",
+    "pathname",
+    "process",
+    "processName",
+    "relativeCreated",
+    "stack_info",
+    "thread",
+    "threadName",
+    "taskName",
 }
 
 _APP_ENV = os.environ.get("APP_ENV", "DEV")
 _SERVICE_NAME = os.environ.get("SERVICE_NAME", "score-agent")
-_LEVEL_LABELS = {"DEBUG": "DEBUG", "INFO": "INFO", "WARNING": "WARN", "ERROR": "ERROR", "CRITICAL": "CRITICAL"}
+_LEVEL_LABELS = {
+    "DEBUG": "DEBUG",
+    "INFO": "INFO",
+    "WARNING": "WARN",
+    "ERROR": "ERROR",
+    "CRITICAL": "CRITICAL",
+}
 
 
 class _LogFormatter(logging.Formatter):

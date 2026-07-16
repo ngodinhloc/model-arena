@@ -8,6 +8,14 @@ import { EventModule } from './event/event.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
-  imports: [DatabaseModule, RedisModule, RabbitMQModule, CatalogModule, ExperimentModule, EventModule, HealthModule],
+  imports: [
+    DatabaseModule,
+    RedisModule,
+    RabbitMQModule,
+    CatalogModule,
+    ExperimentModule,
+    EventModule,
+    HealthModule,
+  ],
 })
 export class AppModule {}

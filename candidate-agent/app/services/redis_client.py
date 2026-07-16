@@ -1,5 +1,7 @@
 from typing import Optional
+
 import redis.asyncio as aioredis
+
 from app.configs.settings import settings
 
 

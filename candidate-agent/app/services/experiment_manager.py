@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import logging
 from datetime import datetime, timedelta, timezone
+
 from app.contracts.experiment_interface import (
     AgentStatus,
     ExperimentCache,
@@ -42,7 +44,9 @@ class ExperimentManager:
 
     async def save(self, experiment_id: str, cache: ExperimentCache) -> None:
         cache.updatedAt = datetime.now(timezone.utc).isoformat()
-        await self._redis.set(self.key(experiment_id), cache.model_dump_json(), ex=CACHE_TTL_SECONDS)
+        await self._redis.set(
+            self.key(experiment_id), cache.model_dump_json(), ex=CACHE_TTL_SECONDS
+        )
 
     async def append_thinking(self, experiment_id: str, node: NodeName, actor: str) -> None:
         cache = await self.load(experiment_id)
@@ -60,7 +64,9 @@ class ExperimentManager:
         cache.updatedAt = (
             datetime.now(timezone.utc) - timedelta(seconds=UNRECOVERABLE_BACKDATE_SECONDS)
         ).isoformat()
-        await self._redis.set(self.key(experiment_id), cache.model_dump_json(), ex=CACHE_TTL_SECONDS)
+        await self._redis.set(
+            self.key(experiment_id), cache.model_dump_json(), ex=CACHE_TTL_SECONDS
+        )
 
     async def set_reply(
         self,

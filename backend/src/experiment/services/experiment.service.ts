@@ -63,11 +63,15 @@ export class ExperimentService {
       judgeConfigs,
     );
 
-    const cache: ExperimentCache = ExperimentCacheBuilder.build(experiment, [], AgentStatus.isThinking);
+    const cache: ExperimentCache = ExperimentCacheBuilder.build(experiment);
     await this.redisService.setJson(this.redisKey(experiment.uuid), cache);
 
-    const event: ExperimentEvent = ExperimentEventBuilder.build(experiment, [], AgentStatus.isThinking);
-    await this.rabbitMQService.publish(EXCHANGE_EXPERIMENT, EVENT_EXPERIMENT_CREATED, event);
+    const event: ExperimentEvent = ExperimentEventBuilder.build(experiment);
+    await this.rabbitMQService.publish(
+      EXCHANGE_EXPERIMENT,
+      EVENT_EXPERIMENT_CREATED,
+      event,
+    );
 
     return { uuid: experiment.uuid };
   }
@@ -87,7 +91,8 @@ export class ExperimentService {
 
   async getExperiment(uuid: string) {
     const experiment = await this.experimentRepo.findOneByUuid(uuid);
-    if (!experiment) throw new NotFoundException(`Experiment ${uuid} not found`);
+    if (!experiment)
+      throw new NotFoundException(`Experiment ${uuid} not found`);
 
     const base: ExperimentItem = {
       uuid: experiment.uuid,
@@ -100,8 +105,14 @@ export class ExperimentService {
     };
 
     if (experiment.status === ExperimentStatus.running) {
-      const cache = await this.redisService.getJson<ExperimentCache>(this.redisKey(uuid));
-      return { ...base, messages: cache?.messages ?? [], agentStatus: cache?.agentStatus ?? AgentStatus.isThinking };
+      const cache = await this.redisService.getJson<ExperimentCache>(
+        this.redisKey(uuid),
+      );
+      return {
+        ...base,
+        messages: cache?.messages ?? [],
+        agentStatus: cache?.agentStatus ?? AgentStatus.isThinking,
+      };
     }
 
     const result = await this.resultRepo.findOne({

@@ -2,20 +2,40 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Result } from '../../database/entities/result.entity';
-import { JudgeScoreSheet, SCORE_CARD_MAX_POINT, SCORE_CARD_NAMES } from '../contracts/experiment.interface';
+import {
+  JudgeScoreSheet,
+  SCORE_CARD_MAX_POINT,
+  SCORE_CARD_NAMES,
+} from '../contracts/experiment.interface';
 
 @Injectable()
 export class AnalyticsService {
-  constructor(@InjectRepository(Result) private readonly resultRepo: Repository<Result>) {}
+  constructor(
+    @InjectRepository(Result) private readonly resultRepo: Repository<Result>,
+  ) {}
 
   async getAnalytics() {
-    const results = await this.resultRepo.find({ relations: { experiment: true } });
+    const results = await this.resultRepo.find({
+      relations: { experiment: true },
+    });
 
-    const modelStats = new Map<string, { wins: number; battles: number; totalScore: number }>();
-    const categoryStats = new Map<string, Map<string, { wins: number; battles: number }>>();
+    const modelStats = new Map<
+      string,
+      { wins: number; battles: number; totalScore: number }
+    >();
+    const categoryStats = new Map<
+      string,
+      Map<string, { wins: number; battles: number }>
+    >();
     const cardScoreStats = new Map<string, { total: number; count: number }>();
-    const cardWinnerStats = new Map<string, Map<string, { wins: number; battles: number }>>();
-    const judgeStats = new Map<string, { totalScore: number; evaluations: number }>();
+    const cardWinnerStats = new Map<
+      string,
+      Map<string, { wins: number; battles: number }>
+    >();
+    const judgeStats = new Map<
+      string,
+      { totalScore: number; evaluations: number }
+    >();
 
     for (const result of results) {
       const score = result.scoreResponse;
@@ -28,7 +48,11 @@ export class AnalyticsService {
         const key = `${cs.provider}/${cs.model}`;
         candidateModels.set(cs.candidateNumber, key);
 
-        const stats = modelStats.get(key) ?? { wins: 0, battles: 0, totalScore: 0 };
+        const stats = modelStats.get(key) ?? {
+          wins: 0,
+          battles: 0,
+          totalScore: 0,
+        };
         stats.battles += 1;
         stats.totalScore += cs.score;
         // The arbiter LLM always picks a definitive winner, even on tied totals.
@@ -36,7 +60,9 @@ export class AnalyticsService {
         if (isWinner) stats.wins += 1;
         modelStats.set(key, stats);
 
-        const catMap = categoryStats.get(category) ?? new Map<string, { wins: number; battles: number }>();
+        const catMap =
+          categoryStats.get(category) ??
+          new Map<string, { wins: number; battles: number }>();
         const catStat = catMap.get(key) ?? { wins: 0, battles: 0 };
         catStat.battles += 1;
         if (isWinner) catStat.wins += 1;
@@ -52,19 +78,29 @@ export class AnalyticsService {
         const judgeModel = /\(([^)]+)\)\s*$/.exec(msg.actor)?.[1] ?? msg.actor;
 
         for (const sheet of msg.response as JudgeScoreSheet[]) {
-          const totals = cardTotals.get(sheet.candidateNumber) ?? new Map<string, number>();
+          const totals =
+            cardTotals.get(sheet.candidateNumber) ?? new Map<string, number>();
           let sheetTotal = 0;
           for (const card of sheet.cards) {
-            const cardStat = cardScoreStats.get(card.cardName) ?? { total: 0, count: 0 };
+            const cardStat = cardScoreStats.get(card.cardName) ?? {
+              total: 0,
+              count: 0,
+            };
             cardStat.total += card.point;
             cardStat.count += 1;
             cardScoreStats.set(card.cardName, cardStat);
-            totals.set(card.cardName, (totals.get(card.cardName) ?? 0) + card.point);
+            totals.set(
+              card.cardName,
+              (totals.get(card.cardName) ?? 0) + card.point,
+            );
             sheetTotal += card.point;
           }
           cardTotals.set(sheet.candidateNumber, totals);
 
-          const jStats = judgeStats.get(judgeModel) ?? { totalScore: 0, evaluations: 0 };
+          const jStats = judgeStats.get(judgeModel) ?? {
+            totalScore: 0,
+            evaluations: 0,
+          };
           jStats.totalScore += sheetTotal;
           jStats.evaluations += 1;
           judgeStats.set(judgeModel, jStats);
@@ -81,7 +117,9 @@ export class AnalyticsService {
         for (const cardName of cardNames) {
           const p1 = totals1.get(cardName) ?? 0;
           const p2 = totals2.get(cardName) ?? 0;
-          const cardMap = cardWinnerStats.get(cardName) ?? new Map<string, { wins: number; battles: number }>();
+          const cardMap =
+            cardWinnerStats.get(cardName) ??
+            new Map<string, { wins: number; battles: number }>();
           const s1 = cardMap.get(model1) ?? { wins: 0, battles: 0 };
           const s2 = cardMap.get(model2) ?? { wins: 0, battles: 0 };
           s1.battles += 1;
@@ -106,14 +144,18 @@ export class AnalyticsService {
           avgScore: s.battles ? Math.round(s.totalScore / s.battles) : 0,
         }))
         .sort((a, b) => b.winRate - a.winRate),
-      categoryWinners: [...categoryStats.entries()].map(([category, catMap]) => ({
-        category,
-        models: [...catMap.entries()]
-          .map(([model, s]) => ({ model, wins: s.wins, battles: s.battles }))
-          .sort((a, b) => b.wins - a.wins),
-      })),
-      scoreCards: SCORE_CARD_NAMES.filter((cardName) => cardScoreStats.has(cardName)).map((cardName) => {
-        const stats = cardScoreStats.get(cardName)!;
+      categoryWinners: [...categoryStats.entries()].map(
+        ([category, catMap]) => ({
+          category,
+          models: [...catMap.entries()]
+            .map(([model, s]) => ({ model, wins: s.wins, battles: s.battles }))
+            .sort((a, b) => b.wins - a.wins),
+        }),
+      ),
+      scoreCards: SCORE_CARD_NAMES.filter((cardName) =>
+        cardScoreStats.has(cardName),
+      ).map((cardName) => {
+        const stats = cardScoreStats.get(cardName);
         return {
           cardName,
           avgPoint: stats.count ? Math.round(stats.total / stats.count) : 0,
@@ -121,16 +163,20 @@ export class AnalyticsService {
           evaluations: stats.count,
         };
       }),
-      scoreCardWinners: SCORE_CARD_NAMES.filter((cardName) => cardWinnerStats.has(cardName)).map((cardName) => ({
+      scoreCardWinners: SCORE_CARD_NAMES.filter((cardName) =>
+        cardWinnerStats.has(cardName),
+      ).map((cardName) => ({
         cardName,
-        models: [...cardWinnerStats.get(cardName)!.entries()]
+        models: [...cardWinnerStats.get(cardName).entries()]
           .map(([model, s]) => ({ model, wins: s.wins, battles: s.battles }))
           .sort((a, b) => b.wins - a.wins),
       })),
       judgeAvgScores: [...judgeStats.entries()]
         .map(([model, s]) => ({
           model,
-          avgScore: s.evaluations ? Math.round(s.totalScore / s.evaluations) : 0,
+          avgScore: s.evaluations
+            ? Math.round(s.totalScore / s.evaluations)
+            : 0,
           evaluations: s.evaluations,
           maxPossible: SCORE_CARD_NAMES.length * SCORE_CARD_MAX_POINT,
         }))

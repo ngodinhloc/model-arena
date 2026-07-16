@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 import logging
+
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agent.judge_interfaces import JudgeVerdict
 from app.agent.judge_state import JudgeState
+from app.agent.judge_templates import JUDGE_PROMPT, JUDGE_SYSTEM
 from app.agent.model_factory import ModelFactory
-from app.agent.judge_templates import JUDGE_SYSTEM, JUDGE_PROMPT
 from app.contracts.experiment_interface import CandidateResponse, Message, NodeName
 from app.services.experiment_manager import ExperimentManager
 
@@ -39,29 +41,47 @@ class JudgeNode:
         self._logger.info(
             "JudgeNode: calling LLM", extra={"experimentId": event.experimentId, "actor": actor}
         )
-        verdict: JudgeVerdict = await llm.ainvoke([
-            SystemMessage(content=JUDGE_SYSTEM.format(
-                judge_number=self._number, persona=cfg.persona, max_point=max_point,
-            )),
-            HumanMessage(content=JUDGE_PROMPT.format(
-                category=event.category,
-                topic=event.topic,
-                max_point=max_point,
-                score_cards="\n".join(f"- {c.cardName}" for c in event.scoreCards),
-                candidate_1=self._format_candidate(self._find_candidate_response(event.messages, 1)),
-                candidate_2=self._format_candidate(self._find_candidate_response(event.messages, 2)),
-            )),
-        ])
+        verdict: JudgeVerdict = await llm.ainvoke(
+            [
+                SystemMessage(
+                    content=JUDGE_SYSTEM.format(
+                        judge_number=self._number,
+                        persona=cfg.persona,
+                        max_point=max_point,
+                    )
+                ),
+                HumanMessage(
+                    content=JUDGE_PROMPT.format(
+                        category=event.category,
+                        topic=event.topic,
+                        max_point=max_point,
+                        score_cards="\n".join(f"- {c.cardName}" for c in event.scoreCards),
+                        candidate_1=self._format_candidate(
+                            self._find_candidate_response(event.messages, 1)
+                        ),
+                        candidate_2=self._format_candidate(
+                            self._find_candidate_response(event.messages, 2)
+                        ),
+                    )
+                ),
+            ]
+        )
 
         await self._manager.set_reply(event.experimentId, actor, verdict.scoreSheets)
         return {}
 
     @staticmethod
-    def _find_candidate_response(messages: list[Message], candidate_number: int) -> CandidateResponse | None:
-        # Multiple rounds produce one CandidateResponse per candidate per round; judge the final round.
+    def _find_candidate_response(
+        messages: list[Message], candidate_number: int
+    ) -> CandidateResponse | None:
+        # Multiple rounds produce one CandidateResponse per candidate per round;
+        # judge the final round.
         latest: CandidateResponse | None = None
         for message in messages:
-            if message.node == NodeName.candidate and f"Candidate {candidate_number} " in message.actor:
+            if (
+                message.node == NodeName.candidate
+                and f"Candidate {candidate_number} " in message.actor
+            ):
                 if isinstance(message.response, CandidateResponse):
                     latest = message.response
         return latest

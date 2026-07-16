@@ -1,4 +1,8 @@
-import { WebSocketGateway, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets';
 import { Injectable, Logger } from '@nestjs/common';
 import { WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
@@ -6,7 +10,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RedisService } from '../../redis/services/redis.service';
 import { Experiment } from '../../database/entities/experiment.entity';
-import { AgentStatus, ExperimentCache, ExperimentStatus } from '../contracts/experiment.interface';
+import {
+  AgentStatus,
+  ExperimentCache,
+  ExperimentStatus,
+} from '../contracts/experiment.interface';
 
 const POLL_INTERVAL_MS = 500;
 const MAX_POLLS = 1200; // 10 min timeout
@@ -17,17 +25,24 @@ const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 // this path, so the uuid must travel as a query param rather than a path segment.
 @Injectable()
 @WebSocketGateway({ path: '/ws/experiments' })
-export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ExperimentGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(ExperimentGateway.name);
   private readonly subscriptions = new Map<WebSocket, NodeJS.Timeout>();
 
   constructor(
     private readonly redisService: RedisService,
-    @InjectRepository(Experiment) private readonly experimentRepo: Repository<Experiment>,
+    @InjectRepository(Experiment)
+    private readonly experimentRepo: Repository<Experiment>,
   ) {}
 
-  async handleConnection(client: WebSocket, req: IncomingMessage): Promise<void> {
-    const uuid = new URL(req.url ?? '', 'http://localhost').searchParams.get('uuid') ?? '';
+  async handleConnection(
+    client: WebSocket,
+    req: IncomingMessage,
+  ): Promise<void> {
+    const uuid =
+      new URL(req.url ?? '', 'http://localhost').searchParams.get('uuid') ?? '';
     if (!UUID_RE.test(uuid)) {
       client.close(1008, 'Expected ?uuid={uuid}');
       return;
@@ -35,7 +50,12 @@ export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconne
 
     const experiment = await this.experimentRepo.findOne({ where: { uuid } });
     if (!experiment) {
-      client.send(JSON.stringify({ event: 'error', data: `Experiment ${uuid} not found` }));
+      client.send(
+        JSON.stringify({
+          event: 'error',
+          data: `Experiment ${uuid} not found`,
+        }),
+      );
       client.close(1008, 'Experiment not found');
       return;
     }
@@ -59,22 +79,31 @@ export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconne
     let polls = 0;
     let lastPayload = '';
 
-    const intervalId = setInterval(async () => {
+    const tick = async (): Promise<void> => {
       if (++polls > MAX_POLLS) {
         this.clearSubscription(client);
-        client.send(JSON.stringify({ event: 'error', data: 'Timed out waiting for agents.' }));
+        client.send(
+          JSON.stringify({
+            event: 'error',
+            data: 'Timed out waiting for agents.',
+          }),
+        );
         client.close(1000, 'Timeout');
         return;
       }
 
       try {
-        const cache = await this.redisService.getJson<ExperimentCache>(`experiment:${uuid}`);
+        const cache = await this.redisService.getJson<ExperimentCache>(
+          `experiment:${uuid}`,
+        );
 
         // Redis alone can't tell us about a recover-service-driven `failed` flip (the cache
         // may still look like a normal in-progress run, or be gone entirely), so periodically
         // cross-check Postgres too.
         if (!cache || polls % STATUS_CHECK_EVERY_N_POLLS === 0) {
-          const experiment = await this.experimentRepo.findOne({ where: { uuid } });
+          const experiment = await this.experimentRepo.findOne({
+            where: { uuid },
+          });
           if (experiment?.status === ExperimentStatus.failed) {
             this.clearSubscription(client);
             client.send(JSON.stringify({ event: 'failed', data: { uuid } }));
@@ -84,7 +113,10 @@ export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconne
         }
         if (!cache) return;
 
-        const payload = JSON.stringify({ event: 'experiment-update', data: cache });
+        const payload = JSON.stringify({
+          event: 'experiment-update',
+          data: cache,
+        });
         if (payload !== lastPayload) {
           lastPayload = payload;
           client.send(payload);
@@ -95,7 +127,9 @@ export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconne
           // Postgres `status` only becomes `completed` once ScoreRespondedHandler drains the
           // RabbitMQ event. Wait for Postgres too, otherwise clients (e.g. the sidebar history
           // list) that refetch on this event can still observe `status: running`.
-          const experiment = await this.experimentRepo.findOne({ where: { uuid } });
+          const experiment = await this.experimentRepo.findOne({
+            where: { uuid },
+          });
           if (experiment?.status === ExperimentStatus.completed) {
             this.clearSubscription(client);
             client.send(JSON.stringify({ event: 'completed', data: { uuid } }));
@@ -105,7 +139,9 @@ export class ExperimentGateway implements OnGatewayConnection, OnGatewayDisconne
       } catch {
         // Redis transient error — keep polling
       }
-    }, POLL_INTERVAL_MS);
+    };
+
+    const intervalId = setInterval(() => void tick(), POLL_INTERVAL_MS);
 
     this.subscriptions.set(client, intervalId);
   }

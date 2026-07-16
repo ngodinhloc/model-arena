@@ -50,6 +50,8 @@ export default function NewExperimentPage() {
 
   useEffect(() => {
     if (categoryId === "") {
+      // Resets topic selection derived from the cleared category; no fetch is needed here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTopics([]);
       setTopicId("");
       return;

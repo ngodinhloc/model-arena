@@ -12,7 +12,12 @@ const LEVEL_LABELS: Record<string, string> = {
 };
 
 export class AppLogger implements LoggerService {
-  private write(level: string, message: string, context?: object, stack?: object): void {
+  private write(
+    level: string,
+    message: string,
+    context?: object,
+    stack?: object,
+  ): void {
     const data: Record<string, unknown> = {};
     if (context && typeof context === 'object') Object.assign(data, context);
     if (stack) data.stack = stack;
@@ -28,7 +33,8 @@ export class AppLogger implements LoggerService {
       process.stdout.write(JSON.stringify(entry) + '\n');
     } else {
       const label = LEVEL_LABELS[level] ?? level;
-      const ctx = Object.keys(data).length > 0 ? ` ${JSON.stringify(data)}` : '';
+      const ctx =
+        Object.keys(data).length > 0 ? ` ${JSON.stringify(data)}` : '';
       process.stdout.write(`[${label}] ${message}${ctx}\n`);
     }
   }

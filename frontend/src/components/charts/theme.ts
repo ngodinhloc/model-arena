@@ -34,6 +34,8 @@ export function useChartTheme(): ChartTheme {
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
+    // window.matchMedia is unavailable during SSR, so the OS preference can only be read here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(query.matches ? DARK_THEME : LIGHT_THEME);
     const handler = (e: MediaQueryListEvent) => setTheme(e.matches ? DARK_THEME : LIGHT_THEME);
     query.addEventListener("change", handler);

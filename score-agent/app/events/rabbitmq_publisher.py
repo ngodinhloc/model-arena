@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import json
 import logging
+
 import aio_pika
+
 from app.configs.event_configs import PUBLISH_EXCHANGE
 
 

@@ -5,7 +5,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { RedisService } from '../../redis/services/redis.service';
 import { Experiment } from '../../database/entities/experiment.entity';
 import { Result } from '../../database/entities/result.entity';
-import { StalledExperimentItem, StallState, TestRecoverDto } from '../dto/test-recover.dto';
+import {
+  StalledExperimentItem,
+  StallState,
+  TestRecoverDto,
+} from '../dto/test-recover.dto';
 import {
   AgentStatus,
   CandidateConfig,
@@ -24,7 +28,8 @@ const STALL_BACKDATE_MS = 10 * 60 * 1000;
 @Injectable()
 export class RecoverService {
   constructor(
-    @InjectRepository(Experiment) private readonly experimentRepo: Repository<Experiment>,
+    @InjectRepository(Experiment)
+    private readonly experimentRepo: Repository<Experiment>,
     @InjectRepository(Result) private readonly resultRepo: Repository<Result>,
     private readonly redisService: RedisService,
   ) {}
@@ -58,7 +63,12 @@ export class RecoverService {
       const experiment = this.buildExperimentEntity(source, uuid);
       await this.experimentRepo.save(experiment);
 
-      const cache = this.buildExperimentCache(source, uuid, dto.stallState, result);
+      const cache = this.buildExperimentCache(
+        source,
+        uuid,
+        dto.stallState,
+        result,
+      );
       await this.redisService.setJson(this.redisKey(uuid), cache);
 
       created.push(this.buildStallExperiment(source, uuid, dto.stallState));
@@ -108,8 +118,15 @@ export class RecoverService {
       rounds: source.rounds,
       candidateConfigs: source.candidateConfig,
       judgeConfigs: source.judgeConfig,
-      scoreCards: SCORE_CARD_NAMES.map((cardName) => ({ cardName, maxPoint: SCORE_CARD_MAX_POINT })),
-      messages: this.stripMessagesByStallState(stallState, result.candidateResponse, result.judgeResponse),
+      scoreCards: SCORE_CARD_NAMES.map((cardName) => ({
+        cardName,
+        maxPoint: SCORE_CARD_MAX_POINT,
+      })),
+      messages: this.stripMessagesByStallState(
+        stallState,
+        result.candidateResponse,
+        result.judgeResponse,
+      ),
       agentStatus: AgentStatus.isThinking,
       updatedAt: new Date(Date.now() - STALL_BACKDATE_MS).toISOString(),
       retryCount: 0,
@@ -131,7 +148,10 @@ export class RecoverService {
     }
   }
 
-  private toCandidateSummary(configs: CandidateConfig[], candidateNumber: 1 | 2) {
+  private toCandidateSummary(
+    configs: CandidateConfig[],
+    candidateNumber: 1 | 2,
+  ) {
     const config = configs.find((c) => c.candidateNumber === candidateNumber);
     return { provider: config?.provider ?? '', model: config?.model ?? '' };
   }

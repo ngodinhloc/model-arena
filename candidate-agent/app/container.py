@@ -1,6 +1,8 @@
 import logging
 from functools import cached_property
+
 from langgraph.graph.state import CompiledStateGraph
+
 from app.agent.candidate_graph import CandidateGraph
 from app.agent.model_factory import ModelFactory
 from app.agent.nodes.advance_round_node import AdvanceRoundNode
@@ -41,7 +43,9 @@ class Container:
 
     @cached_property
     def publish_node(self) -> PublishNode:
-        return PublishNode(self.experiment_manager, self.rabbitmq_publisher, self.logger("publish_node"))
+        return PublishNode(
+            self.experiment_manager, self.rabbitmq_publisher, self.logger("publish_node")
+        )
 
     @cached_property
     def agent_graph(self) -> CompiledStateGraph:
@@ -56,7 +60,9 @@ class Container:
     @cached_property
     def experiment_event_handler(self) -> ExperimentEventHandler:
         return ExperimentEventHandler(
-            self.agent_graph, self.experiment_manager, self.logger("experiment_event_handler"),
+            self.agent_graph,
+            self.experiment_manager,
+            self.logger("experiment_event_handler"),
         )
 
     @cached_property

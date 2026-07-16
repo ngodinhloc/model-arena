@@ -33,7 +33,7 @@ export default function ExperimentCard({ uuid, topic, category, candidate1, cand
           Running
         </span>
       </div>
-      <p className="mb-3 line-clamp-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">"{topic}"</p>
+      <p className="mb-3 line-clamp-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">&quot;{topic}&quot;</p>
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300">
           <Bot size={12} />

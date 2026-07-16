@@ -7,5 +7,5 @@ export const EVENT_SCORES_RESPONDED = 'model_arena.scores.responded';
 export const BACKEND_QUEUE = 'backend.queue';
 
 export interface EventHandler {
-    handle(event: ExperimentEvent): Promise<void>;
+  handle(event: ExperimentEvent): Promise<void>;
 }

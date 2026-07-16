@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import logging
-from langgraph.graph import StateGraph, START, END
+
+from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.agent.candidate_state import CandidateState
@@ -44,8 +46,12 @@ class CandidateGraph:
 
     def build(self) -> CompiledStateGraph:
         graph = StateGraph(CandidateState)
-        graph.add_node("candidate_1", CandidateNode(1, self._manager, self._logger, self._model_factory))
-        graph.add_node("candidate_2", CandidateNode(2, self._manager, self._logger, self._model_factory))
+        graph.add_node(
+            "candidate_1", CandidateNode(1, self._manager, self._logger, self._model_factory)
+        )
+        graph.add_node(
+            "candidate_2", CandidateNode(2, self._manager, self._logger, self._model_factory)
+        )
         graph.add_node("advance_round", self._advance_round_node)
         graph.add_node("publish", self._publish_node)
         graph.add_edge(START, "candidate_1")

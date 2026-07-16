@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import * as amqp from 'amqplib';
 
 @Injectable()
@@ -8,7 +13,8 @@ export class RabbitMQPublisherService implements OnModuleInit, OnModuleDestroy {
   private channel: amqp.Channel | null = null;
 
   async onModuleInit() {
-    const url = process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672/';
+    const url =
+      process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672/';
     await this.connect(url);
   }
 
@@ -17,7 +23,9 @@ export class RabbitMQPublisherService implements OnModuleInit, OnModuleDestroy {
     try {
       this.connection = await amqp.connect(url);
       this.channel = await this.connection.createChannel();
-      this.logger.log('RabbitMQPublisherService.connect: Connected to RabbitMQ');
+      this.logger.log(
+        'RabbitMQPublisherService.connect: Connected to RabbitMQ',
+      );
     } catch (err) {
       if (attempt >= maxAttempts) throw err;
       const delay = Math.min(1000 * attempt, 10000);
@@ -35,15 +43,30 @@ export class RabbitMQPublisherService implements OnModuleInit, OnModuleDestroy {
     await this.connection?.close();
   }
 
-  async publish(exchange: string, routingKey: string, payload: unknown): Promise<void> {
+  async publish(
+    exchange: string,
+    routingKey: string,
+    payload: unknown,
+  ): Promise<void> {
     if (!this.channel) {
-      this.logger.error('RabbitMQPublisherService.publish: channel not ready', { exchange, routingKey });
+      this.logger.error('RabbitMQPublisherService.publish: channel not ready', {
+        exchange,
+        routingKey,
+      });
       return;
     }
     await this.channel.assertExchange(exchange, 'topic', { durable: true });
-    this.channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(payload)), {
-      persistent: true,
+    this.channel.publish(
+      exchange,
+      routingKey,
+      Buffer.from(JSON.stringify(payload)),
+      {
+        persistent: true,
+      },
+    );
+    this.logger.log('RabbitMQPublisherService.publish: Published', {
+      exchange,
+      routingKey,
     });
-    this.logger.log('RabbitMQPublisherService.publish: Published', { exchange, routingKey });
   }
 }

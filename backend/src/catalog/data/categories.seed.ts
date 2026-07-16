@@ -134,8 +134,10 @@ const CATEGORY_TOPICS: Record<string, string[]> = {
 
 let nextTopicId = 1;
 
-export const CATEGORIES: CategorySeed[] = Object.entries(CATEGORY_TOPICS).map(([name, topics], index) => ({
-  id: index + 1,
-  name,
-  topics: topics.map((topic) => ({ id: nextTopicId++, topic })),
-}));
+export const CATEGORIES: CategorySeed[] = Object.entries(CATEGORY_TOPICS).map(
+  ([name, topics], index) => ({
+    id: index + 1,
+    name,
+    topics: topics.map((topic) => ({ id: nextTopicId++, topic })),
+  }),
+);

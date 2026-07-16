@@ -25,7 +25,8 @@ const LOCK_TTL_MS = 20_000;
 @Injectable()
 export class ExperimentManager {
   constructor(
-    @InjectRepository(Experiment) private readonly experimentRepo: Repository<Experiment>,
+    @InjectRepository(Experiment)
+    private readonly experimentRepo: Repository<Experiment>,
     private readonly redisService: RedisService,
   ) {}
 
@@ -46,15 +47,24 @@ export class ExperimentManager {
   }
 
   async saveCache(cache: ExperimentCache): Promise<void> {
-    await this.redisService.setJson(this.redisKey(cache.experimentId), cache, CACHE_TTL_SECONDS);
+    await this.redisService.setJson(
+      this.redisKey(cache.experimentId),
+      cache,
+      CACHE_TTL_SECONDS,
+    );
   }
 
   async findRunning(): Promise<Experiment[]> {
-    return this.experimentRepo.find({ where: { status: ExperimentStatus.running } });
+    return this.experimentRepo.find({
+      where: { status: ExperimentStatus.running },
+    });
   }
 
   async markFailed(experiment: Experiment): Promise<void> {
-    await this.experimentRepo.update({ id: experiment.id }, { status: ExperimentStatus.failed });
+    await this.experimentRepo.update(
+      { id: experiment.id },
+      { status: ExperimentStatus.failed },
+    );
   }
 
   // Redis had nothing at all for this experiment (cache missing/expired) — rebuild a
@@ -69,7 +79,10 @@ export class ExperimentManager {
       rounds: experiment.rounds,
       candidateConfigs: experiment.candidateConfig,
       judgeConfigs: experiment.judgeConfig,
-      scoreCards: SCORE_CARD_NAMES.map((cardName) => ({ cardName, maxPoint: SCORE_CARD_MAX_POINT })),
+      scoreCards: SCORE_CARD_NAMES.map((cardName) => ({
+        cardName,
+        maxPoint: SCORE_CARD_MAX_POINT,
+      })),
       messages: [],
       agentStatus: AgentStatus.isThinking,
       updatedAt: new Date().toISOString(),

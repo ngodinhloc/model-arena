@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { AppModule } from './app.module';
 import { LoggingMiddleware } from './common/middleware/logging.middleware';
@@ -8,7 +9,9 @@ import { AppLogger } from './common/logger/services/app-logger';
 
 async function bootstrap() {
   const appLogger = new AppLogger();
-  const app = await NestFactory.create(AppModule, { logger: appLogger });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: appLogger,
+  });
   app.getHttpAdapter().getInstance().disable('etag');
 
   const corsOrigins = process.env.CORS_ORIGINS
@@ -17,9 +20,10 @@ async function bootstrap() {
 
   app.enableCors({ origin: corsOrigins, credentials: true });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  app.useWebSocketAdapter(new WsAdapter(app) as any);
-  app.use(new LoggingMiddleware(appLogger).use.bind(new LoggingMiddleware(appLogger)));
+  app.useWebSocketAdapter(new WsAdapter(app));
+  app.use(
+    new LoggingMiddleware(appLogger).use.bind(new LoggingMiddleware(appLogger)),
+  );
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -34,4 +38,4 @@ async function bootstrap() {
   console.log(`Backend listening on port ${port}`);
 }
 
-bootstrap();
+void bootstrap();

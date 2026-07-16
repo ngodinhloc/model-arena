@@ -1,6 +1,8 @@
 import logging
 from functools import cached_property
+
 from langgraph.graph.state import CompiledStateGraph
+
 from app.agent.model_factory import ModelFactory
 from app.agent.score_graph import ScoreGraph
 from app.configs.event_configs import CONSUME_ROUTING_KEY
@@ -36,7 +38,10 @@ class Container:
     @cached_property
     def agent_graph(self) -> CompiledStateGraph:
         return ScoreGraph(
-            self.experiment_manager, self.rabbitmq_publisher, self.logger("score_graph"), self.model_factory
+            self.experiment_manager,
+            self.rabbitmq_publisher,
+            self.logger("score_graph"),
+            self.model_factory,
         ).build()
 
     @cached_property

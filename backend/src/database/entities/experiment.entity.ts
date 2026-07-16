@@ -6,7 +6,11 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
-import { CandidateConfig, JudgeConfig, ExperimentStatus } from '../../experiment/contracts/experiment.interface';
+import {
+  CandidateConfig,
+  JudgeConfig,
+  ExperimentStatus,
+} from '../../experiment/contracts/experiment.interface';
 
 @Entity('experiments')
 export class Experiment {

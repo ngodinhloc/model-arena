@@ -6,10 +6,7 @@ const SKIP_LOGGING_PATHS = ['/api/health'];
 
 @Injectable()
 export class LoggingMiddleware implements NestMiddleware {
-  constructor(
-    private readonly logger: AppLogger,
-  ) {
-  }
+  constructor(private readonly logger: AppLogger) {}
 
   use(req: Request, res: Response, next: NextFunction) {
     const { method, originalUrl } = req;

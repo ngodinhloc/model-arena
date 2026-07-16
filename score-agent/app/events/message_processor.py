@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import json
 import logging
+
 import aio_pika
+
 from app.contracts.experiment_interface import ExperimentEvent
 
 
@@ -15,7 +18,11 @@ class MessageProcessor:
         if payload is None or experiment_id is None or event_name is None:
             self._logger.warning(
                 "MessageProcessor.process: Invalid message, missing required fields",
-                extra={"experimentId": experiment_id, "eventName": event_name, "hasPayload": payload is not None},
+                extra={
+                    "experimentId": experiment_id,
+                    "eventName": event_name,
+                    "hasPayload": payload is not None,
+                },
             )
             return
 
@@ -35,10 +42,14 @@ class MessageProcessor:
                 extra={"experimentId": experiment_id, "eventName": event_name, "error": str(e)},
             )
 
-    def _parse_message(self, message: aio_pika.abc.AbstractIncomingMessage) -> tuple[str | None, str | None, dict | None]:
+    def _parse_message(
+        self, message: aio_pika.abc.AbstractIncomingMessage
+    ) -> tuple[str | None, str | None, dict | None]:
         try:
             payload = json.loads(message.body)
             return payload.get("eventName"), payload.get("experimentId"), payload
         except Exception as e:
-            self._logger.exception("MessageProcessor._parse_message: Failed to parse message", extra={"error": str(e)})
+            self._logger.exception(
+                "MessageProcessor._parse_message: Failed to parse message", extra={"error": str(e)}
+            )
             return None, None, None

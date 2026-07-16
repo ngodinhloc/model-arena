@@ -5,8 +5,10 @@ import { ExperimentManager } from './experiment.manager';
 import { ReplayStrategy } from './replay.strategy';
 import { AgentStatus } from '../contracts/experiment.interface';
 
-const STALE_THRESHOLD_MS = parseInt(process.env.STALE_THRESHOLD_SECONDS ?? '120', 10) * 1000;
-const SWEEP_INTERVAL_MS = parseInt(process.env.SWEEP_INTERVAL_SECONDS ?? '30', 10) * 1000;
+const STALE_THRESHOLD_MS =
+  parseInt(process.env.STALE_THRESHOLD_SECONDS ?? '120', 10) * 1000;
+const SWEEP_INTERVAL_MS =
+  parseInt(process.env.SWEEP_INTERVAL_SECONDS ?? '30', 10) * 1000;
 const MAX_RETRIES = parseInt(process.env.MAX_RETRIES ?? '3', 10);
 const SWEEP_CONCURRENCY = 25;
 
@@ -27,7 +29,9 @@ export class RecoveryService {
 
     for (let i = 0; i < runningExperiments.length; i += SWEEP_CONCURRENCY) {
       const batch = runningExperiments.slice(i, i + SWEEP_CONCURRENCY);
-      await Promise.all(batch.map((experiment) => this.checkExperiment(experiment)));
+      await Promise.all(
+        batch.map((experiment) => this.checkExperiment(experiment)),
+      );
     }
   }
 
@@ -53,9 +57,12 @@ export class RecoveryService {
       if (ageMs < STALE_THRESHOLD_MS) return; // still legitimately in progress
 
       if (cache.retryCount >= MAX_RETRIES) {
-        this.logger.warn('RecoveryService.checkExperiment: retries exhausted, marking failed', {
-          uuid: experiment.uuid,
-        });
+        this.logger.warn(
+          'RecoveryService.checkExperiment: retries exhausted, marking failed',
+          {
+            uuid: experiment.uuid,
+          },
+        );
         await this.experimentManager.markFailed(experiment);
         return;
       }

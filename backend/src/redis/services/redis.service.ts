@@ -1,4 +1,9 @@
-import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
 import Redis from 'ioredis';
 
 export const EXPERIMENT_TTL_SECONDS = 1800;
@@ -28,7 +33,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return JSON.parse(raw) as T;
   }
 
-  async setJson(key: string, value: unknown, ttlSeconds = EXPERIMENT_TTL_SECONDS): Promise<void> {
+  async setJson(
+    key: string,
+    value: unknown,
+    ttlSeconds = EXPERIMENT_TTL_SECONDS,
+  ): Promise<void> {
     await this.client.set(key, JSON.stringify(value), 'EX', ttlSeconds);
   }
 

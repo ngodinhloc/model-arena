@@ -23,14 +23,23 @@ interface ReplayTarget {
 // Where to replay a stalled stage. The target's queue reloads state from the (stripped)
 // Redis cache, so republishing here re-runs that stage cleanly from scratch.
 const STAGE_REPLAY_TARGETS: Record<NodeName, ReplayTarget> = {
-  candidate: { exchange: EXCHANGE_EXPERIMENT, routingKey: EVENT_EXPERIMENT_CREATED },
-  judge: { exchange: EXCHANGE_CANDIDATES, routingKey: EVENT_CANDIDATES_RESPONDED },
+  candidate: {
+    exchange: EXCHANGE_EXPERIMENT,
+    routingKey: EVENT_EXPERIMENT_CREATED,
+  },
+  judge: {
+    exchange: EXCHANGE_CANDIDATES,
+    routingKey: EVENT_CANDIDATES_RESPONDED,
+  },
   score: { exchange: EXCHANGE_JUDGES, routingKey: EVENT_JUDGES_RESPONDED },
 };
 
 // If the pipeline fully finished (Redis says hasReplied) but Postgres never flipped to
 // completed, backend itself dropped/crashed on the terminal event — replay that instead.
-const FINAL_REPLAY_TARGET: ReplayTarget = { exchange: EXCHANGE_SCORES, routingKey: EVENT_SCORES_RESPONDED };
+const FINAL_REPLAY_TARGET: ReplayTarget = {
+  exchange: EXCHANGE_SCORES,
+  routingKey: EVENT_SCORES_RESPONDED,
+};
 
 // Owns the mechanics of re-publishing a stalled experiment: picking the right exchange,
 // making the replay idempotent, and bumping retry/updatedAt bookkeeping in the cache.
@@ -57,13 +66,19 @@ export class ReplayStrategy {
     const target = STAGE_REPLAY_TARGETS[stuckNode];
     const strippedMessages = cache.messages.filter((m) => m.node !== stuckNode);
 
-    this.logger.log('ReplayStrategy.replayStalledStage: replaying stalled stage', {
-      experimentId: cache.experimentId,
-      stuckNode,
-      retryCount: cache.retryCount,
-    });
+    this.logger.log(
+      'ReplayStrategy.replayStalledStage: replaying stalled stage',
+      {
+        experimentId: cache.experimentId,
+        stuckNode,
+        retryCount: cache.retryCount,
+      },
+    );
 
-    await this.bumpRetryAndPublish({ ...cache, messages: strippedMessages }, target);
+    await this.bumpRetryAndPublish(
+      { ...cache, messages: strippedMessages },
+      target,
+    );
   }
 
   // Picks the earliest stage that hasn't fully completed yet, by comparing completed message
@@ -73,31 +88,41 @@ export class ReplayStrategy {
   // as stuck would then re-run an already-finished stage forever instead of advancing.
   private determineStuckNode(cache: ExperimentCache): NodeName | null {
     const repliedCount = (node: NodeName) =>
-      cache.messages.filter((m) => m.node === node && m.agentStatus === AgentStatus.hasReplied).length;
+      cache.messages.filter(
+        (m) => m.node === node && m.agentStatus === AgentStatus.hasReplied,
+      ).length;
 
-    const candidateDone = repliedCount('candidate') >= cache.rounds * cache.candidateConfigs.length;
+    const candidateDone =
+      repliedCount('candidate') >= cache.rounds * cache.candidateConfigs.length;
     if (!candidateDone) return 'candidate';
 
     const judgeDone = repliedCount('judge') >= cache.judgeConfigs.length;
     if (!judgeDone) return 'judge';
 
     const scoreMessage = cache.messages.find((m) => m.node === 'score');
-    if (!scoreMessage || scoreMessage.agentStatus !== AgentStatus.hasReplied) return 'score';
+    if (!scoreMessage || scoreMessage.agentStatus !== AgentStatus.hasReplied)
+      return 'score';
 
     return null;
   }
 
-  // Replays the terminal scores-responded event when the pipeline finished (Redis says hasReplied) 
+  // Replays the terminal scores-responded event when the pipeline finished (Redis says hasReplied)
   // but backend never consumed it — no stripping needed since no node re-runs.
   async replayStalledFinal(cache: ExperimentCache): Promise<void> {
-    this.logger.log('ReplayStrategy.replayStalledFinal: replaying terminal event to backend', {
-      experimentId: cache.experimentId,
-      retryCount: cache.retryCount,
-    });
+    this.logger.log(
+      'ReplayStrategy.replayStalledFinal: replaying terminal event to backend',
+      {
+        experimentId: cache.experimentId,
+        retryCount: cache.retryCount,
+      },
+    );
     await this.bumpRetryAndPublish(cache, FINAL_REPLAY_TARGET);
   }
 
-  private async bumpRetryAndPublish(cache: ExperimentCache, target: ReplayTarget): Promise<void> {
+  private async bumpRetryAndPublish(
+    cache: ExperimentCache,
+    target: ReplayTarget,
+  ): Promise<void> {
     const updatedCache: ExperimentCache = {
       ...cache,
       retryCount: cache.retryCount + 1,
@@ -105,7 +130,11 @@ export class ReplayStrategy {
     };
     await this.experimentManager.saveCache(updatedCache);
 
-    await this.rabbitMQPublisher.publish(target.exchange, target.routingKey, this.buildEvent(updatedCache, target.routingKey));
+    await this.rabbitMQPublisher.publish(
+      target.exchange,
+      target.routingKey,
+      this.buildEvent(updatedCache, target.routingKey),
+    );
   }
 
   // Every agent's MessageProcessor dispatches its handler by looking up payload.eventName
